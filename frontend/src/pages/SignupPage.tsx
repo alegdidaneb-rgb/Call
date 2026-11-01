@@ -7,7 +7,11 @@ import { z } from "zod";
 const signupSchema = z.object({
   fullName: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Please enter a valid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z
+    .string()
+    .min(10, "Password must be at least 10 characters")
+    .regex(/[a-zA-Z]/, "Password must contain a letter")
+    .regex(/[0-9]/, "Password must contain a number"),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords do not match",
@@ -23,6 +27,7 @@ export function SignupPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -42,7 +47,11 @@ export function SignupPage() {
 
     setLoading(true);
     try {
-      await signUp(email, password, fullName);
+      const { needsConfirmation } = await signUp(email, password, fullName);
+      if (needsConfirmation) {
+        setNeedsEmailConfirmation(true);
+        return;
+      }
       navigate("/login");
     } catch (err: any) {
       setError(err.message ?? "Signup failed");
@@ -58,6 +67,22 @@ export function SignupPage() {
           <h1 className="text-3xl font-bold text-brand-900">Cold Dialer</h1>
           <p className="text-brand-600 mt-2">Create your account</p>
         </div>
+
+        {needsEmailConfirmation && (
+          <div
+            role="status"
+            className="mb-6 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800"
+          >
+            <p className="font-semibold">Check your inbox</p>
+            <p className="mt-1">
+              We sent a confirmation link to <span className="font-medium">{email}</span>.
+              Open it to activate your account, then sign in.
+            </p>
+            <Link to="/login" className="mt-2 inline-block font-medium underline">
+              Go to sign in
+            </Link>
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-lg p-8 space-y-5">
           <h2 className="text-xl font-semibold text-gray-800">Sign Up</h2>
           {error && (

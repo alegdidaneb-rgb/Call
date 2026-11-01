@@ -22,20 +22,46 @@ export function devFallbackUser(): AppUser | null {
   return import.meta.env.DEV ? DEV_USER : null;
 }
 
-export async function signUp(email: string, password: string, fullName: string): Promise<AppUser> {
+export interface SignUpResult {
+  user: AppUser;
+  /**
+   * True when Supabase requires email confirmation before the account can sign
+   * in. The caller must tell the user to check their inbox rather than sending
+   * them to a login form that will reject them.
+   */
+  needsConfirmation: boolean;
+}
+
+export async function signUp(
+  email: string,
+  password: string,
+  fullName: string
+): Promise<SignUpResult> {
   if (isApiMode) {
     const { user, token } = await api.auth.signup(email, password, fullName);
     setAuthToken(token);
-    return toAppUser(user);
+    return { user: toAppUser(user), needsConfirmation: false };
   }
+
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { full_name: fullName } },
+    options: {
+      data: { full_name: fullName },
+      /**
+       * This Supabase project is shared, and its `site_url` belongs to another
+       * application. Pinning the redirect here means confirmation emails return
+       * to *this* deployment instead of that app's domain. The origin must be
+       * listed in Supabase Auth → URL Configuration → Redirect URLs.
+       */
+      emailRedirectTo: typeof window === "undefined" ? undefined : window.location.origin,
+    },
   });
   if (error) throw error;
   if (!data.user) throw new Error("Sign up did not return a user");
-  return toAppUser(await fetchSupabaseProfile(data.user.id, data.user.email));
+
+  const profile = await fetchSupabaseProfile(data.user.id, data.user.email);
+  return { user: toAppUser(profile), needsConfirmation: !data.session };
 }
 
 export async function signIn(email: string, password: string): Promise<AppUser> {
