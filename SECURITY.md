@@ -77,6 +77,37 @@ Never commit these files (they are git-ignored):
 
 Use `.env.example` and `backend/.env.example` as templates.
 
+## Dependency Advisories
+
+`npm audit` is run as part of any dependency change. Current state:
+
+- **Backend: 0 known vulnerabilities.** Express 4 pins `proxy-addr ~2.0.7`,
+  `body-parser ~1.20.5` and `qs ~6.16.0`, all of which have published
+  advisories. The critical one, `proxy-addr` IP spoofing via IPv4-mapped IPv6
+  trust subnets, directly undermined IP-based rate limiting, so
+  `overrides` in `backend/package.json` force `proxy-addr ^2.0.8`,
+  `body-parser ^1.20.9` and `qs ^6.16.2`. These are patch-level and avoid an
+  Express 5 migration. Re-check the overrides on every Express bump.
+- **Frontend: 7 moderate advisories, 0 high or critical**, all accepted:
+  - `eslint` and its `minimatch` / `@eslint/*` chain — development-only linter,
+    never shipped to the browser. No fix exists within ESLint 9; ESLint 10 drops
+    `.eslintrc` support, which this project uses, so upgrading means migrating to
+    flat config first.
+  - `react-router` / `react-router-dom` — an open redirect via a backslash in
+    `<Link to>` / `navigate()`. **Not reachable here**: every navigation target
+    in this codebase is a static literal or `/leads/${lead.id}`, where `lead.id`
+    is a server-generated UUID primary key (`default gen_random_uuid()`) and never
+    client-controlled. The fix requires React Router 7, whose
+    `v7_relativeSplatPath` default changes relative resolution for the
+    `path="/*"` + nested `<Routes>` pattern used in `App.tsx`. Revisit when that
+    routing is flattened.
+
+Unused dependencies are removed rather than patched: `multer`, `papaparse` and
+the whole Drizzle layer (`drizzle-orm`, `drizzle-kit`, `src/db/schema.ts`) were
+declared but never imported by runtime code. Dropping Drizzle also removes a
+second, competing definition of the schema — the DDL in `src/db/database.ts` is
+now the single source of truth for SQLite.
+
 ## Hardening Checklist for Production
 
 - [ ] `JWT_SECRET` generated with `openssl rand -hex 32` (API mode)
