@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/components/auth/AuthProvider";
+import type { AppRole } from "@/types/app";
 import { signOut } from "@/lib/auth";
 import {
   LayoutDashboard,
@@ -17,18 +18,27 @@ import {
   Search,
 } from "lucide-react";
 
-const navItems = [
+interface NavItem {
+  to: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  /** When set, the entry is only rendered for these roles. */
+  roles?: AppRole[];
+}
+
+const navItems: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/leads", label: "Leads", icon: Users },
   { to: "/campaigns", label: "Campaigns", icon: Target },
   { to: "/scripts", label: "Scripts", icon: FileText },
   { to: "/history", label: "Call History", icon: Clock },
-  { to: "/admin", label: "Admin", icon: Shield },
+  { to: "/admin", label: "Admin", icon: Shield, roles: ["admin"] },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user } = useAuth();
+  const visibleNavItems = navItems.filter((item) => !item.roles || item.roles.includes(user?.role ?? "agent"));
   const navigate = useNavigate();
 
   async function handleSignOut() {
@@ -59,7 +69,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </button>
         </div>
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             return (
               <NavLink
@@ -88,7 +98,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </div>
             <div className="min-w-0">
               <p className="text-sm font-medium text-gray-900 truncate">
-                {user?.user_metadata?.full_name ?? user?.email ?? "User"}
+                {user?.fullName ?? user?.email ?? "User"}
               </p>
               <p className="text-xs text-gray-500 truncate">{user?.email}</p>
             </div>

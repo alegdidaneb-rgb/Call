@@ -4,11 +4,11 @@ A free, open-source browser-based cold calling dialer with SIP support. No insta
 
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Node](https://img.shields.io/badge/node-20%2B-brightgreen)
-![Stars](https://img.shields.io/github/stars/6t9xstar/Open-Cold-Dialer?style=social)
-![Forks](https://img.shields.io/github/forks/6t9xstar/Open-Cold-Dialer?style=social)
-![Last Commit](https://img.shields.io/github/last-commit/6t9xstar/Open-Cold-Dialer)
-![Issues](https://img.shields.io/github/issues/6t9xstar/Open-Cold-Dialer)
-![License](https://img.shields.io/github/license/6t9xstar/Open-Cold-Dialer)
+![Stars](https://img.shields.io/github/stars/alegdidaneb-rgb/Call?style=social)
+![Forks](https://img.shields.io/github/forks/alegdidaneb-rgb/Call?style=social)
+![Last Commit](https://img.shields.io/github/last-commit/alegdidaneb-rgb/Call)
+![Issues](https://img.shields.io/github/issues/alegdidaneb-rgb/Call)
+![License](https://img.shields.io/github/license/alegdidaneb-rgb/Call)
 
 ---
 
@@ -62,8 +62,8 @@ A free, open-source browser-based cold calling dialer with SIP support. No insta
 ### Option 1: Self-Hosted (Recommended)
 
 ```bash
-git clone https://github.com/6t9xstar/Open-Cold-Dialer.git
-cd Open-Cold-Dialer
+git clone https://github.com/alegdidaneb-rgb/Call.git
+cd Call
 
 # Backend
 cd backend
@@ -81,13 +81,15 @@ npm run dev
 
 Open http://localhost:3000 — 20 sample leads pre-loaded.
 
-**Default login:** `admin@example.com` / `password123`
+**Seeded login:** `admin@example.com`. The seed script uses the well-known
+development password `password123` unless `SEED_ADMIN_PASSWORD` is set, and warns
+when it does. Never run the seed against a reachable deployment without setting it.
 
 ### Option 2: Docker
 
 ```bash
-git clone https://github.com/6t9xstar/Open-Cold-Dialer.git
-cd Open-Cold-Dialer
+git clone https://github.com/alegdidaneb-rgb/Call.git
+cd Call
 cp .env.example .env.local
 docker compose up -d
 docker compose exec backend npm run seed
@@ -96,7 +98,7 @@ docker compose exec backend npm run seed
 ### Option 3: Supabase (Cloud)
 
 ```bash
-git clone https://github.com/6t9xstar/Open-Cold-Dialer.git
+git clone https://github.com/alegdidaneb-rgb/Call.git
 cd Open-Cold-Dialer/frontend
 npm install
 cp .env.example .env.local
@@ -193,7 +195,7 @@ Open-Cold-Dialer/
 - [ ] Webhook integrations
 - [ ] AI call summary
 
-See [Open Issues](https://github.com/6t9xstar/Open-Cold-Dialer/issues) for more.
+See [Open Issues](https://github.com/alegdidaneb-rgb/Call/issues) for more.
 
 ---
 
@@ -220,10 +222,49 @@ MIT License — see [LICENSE](LICENSE)
 
 ---
 
+## Deploying (Vercel + Supabase)
+
+The frontend is a static Vite SPA, so it hosts on Vercel. Persistence and auth come
+from Supabase, and **Row Level Security is the access control layer** — see
+[SECURITY.md](SECURITY.md).
+
+1. **Supabase** — apply `supabase/migrations/001_init.sql` to your project (SQL
+   editor, or `supabase db push`). This enables RLS on every table.
+2. **First account** — sign up through the app. The first profile created is
+   automatically granted the `admin` role; every account after that is an `agent`.
+3. **Vercel** — import this repository and set Root directory `frontend`, Framework
+   `vite`, Build command `npm run build`, Output directory `dist`.
+4. **Environment variables** (Vercel → Project → Settings → Environment Variables):
+
+   | Key | Value |
+   |---|---|
+   | `VITE_SUPABASE_URL` | `https://<ref>.supabase.co` |
+   | `VITE_SUPABASE_ANON_KEY` | publishable/anon key (public by design) |
+
+   Leave `VITE_API_URL` **empty**. Setting it switches the app to self-hosted API
+   mode, which needs a Node server with a writable disk and will not work on Vercel.
+
+5. **SIP** — add `VITE_SIP_URI`, `VITE_SIP_PASSWORD`, `VITE_SIP_WS_URL` and
+   `VITE_SIP_CALLER_ID` to place real calls. These are compiled into the browser
+   bundle, so issue one low-privilege extension per agent and rotate on suspicion.
+
+> The Express + SQLite backend is for self-hosting (Docker or a VPS). It requires
+> `JWT_SECRET` and refuses to start in production without it.
+
+---
+
+## Attribution
+
+Derived from [Open Cold Dialer](https://github.com/6t9xstar/Open-Cold-Dialer) by
+[@6t9xstar](https://github.com/6t9xstar), used under the MIT License. The full
+license text is preserved in [LICENSE](LICENSE).
+
+---
+
 ## Contributors
 
 <a href="https://github.com/6t9xstar">
-  <img src="https://contrib.rocks/image?repo=6t9xstar/Open-Cold-Dialer" />
+  <img src="https://contrib.rocks/image?repo=alegdidaneb-rgb/Call" />
 </a>
 
 ---
@@ -234,7 +275,7 @@ MIT License — see [LICENSE](LICENSE)
 - [Quick Start Guide](docs/quick-start.md)
 - [SIP Provider Guides](docs/sip-providers.md)
 - [Deployment Guide](docs/deployment.md)
-- [GitHub Issues](https://github.com/6t9xstar/Open-Cold-Dialer/issues)
+- [GitHub Issues](https://github.com/alegdidaneb-rgb/Call/issues)
 
 ---
 
@@ -242,4 +283,4 @@ MIT License — see [LICENSE](LICENSE)
 
 If you find this useful, please give it a star! It helps others discover the project.
 
-[![Star History Chart](https://api.star-history.com/svg?repos=6t9xstar/Open-Cold-Dialer&type=Date)](https://star-history.com/#6t9xstar/Open-Cold-Dialer&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=alegdidaneb-rgb/Call&type=Date)](https://star-history.com/#alegdidaneb-rgb/Call&Date)

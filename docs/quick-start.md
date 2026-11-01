@@ -11,7 +11,7 @@ Get Cold Dialer running in 5 minutes.
 
 ```bash
 # Clone the repository
-git clone https://github.com/6t9xstar/cold-dialer.git
+git clone https://github.com/alegdidaneb-rgb/Call.git
 cd cold-dialer
 
 # Setup backend
@@ -34,7 +34,7 @@ Open http://localhost:3000
 
 ```bash
 # Clone the repository
-git clone https://github.com/6t9xstar/cold-dialer.git
+git clone https://github.com/alegdidaneb-rgb/Call.git
 cd cold-dialer
 
 # Setup frontend
@@ -50,7 +50,7 @@ Open http://localhost:3000
 ## Option 3: Docker
 
 ```bash
-git clone https://github.com/6t9xstar/cold-dialer.git
+git clone https://github.com/alegdidaneb-rgb/Call.git
 cd cold-dialer
 
 # Copy environment file

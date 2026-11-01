@@ -29,7 +29,7 @@ I built **Open Cold Dialer** — a free, open-source cold calling CRM with a bui
 
 **Quick start:**
 ```bash
-git clone https://github.com/6t9xstar/Open-Cold-Dialer.git
+git clone https://github.com/alegdidaneb-rgb/Call.git
 cd Open-Cold-Dialer/backend && npm install && npm run seed && npm run dev
 ```
 
@@ -37,7 +37,7 @@ Opens on localhost:3000 with 20 sample leads.
 
 Would love feedback from the community. If you find it useful, a star on GitHub helps!
 
-**GitHub:** https://github.com/6t9xstar/Open-Cold-Dialer
+**GitHub:** https://github.com/alegdidaneb-rgb/Call
 
 ---
 
@@ -70,7 +70,7 @@ Built a free, open-source alternative to paid cold calling software.
 
 Self-hosted with Docker or run locally. Works with any SIP provider.
 
-GitHub: https://github.com/6t9xstar/Open-Cold-Dialer
+GitHub: https://github.com/alegdidaneb-rgb/Call
 
 ---
 
@@ -95,7 +95,7 @@ I built an open-source cold calling dialer. It's a browser-based softphone with 
 - Suggestions for improvements
 - Anyone who wants to contribute
 
-GitHub: https://github.com/6t9xstar/Open-Cold-Dialer
+GitHub: https://github.com/alegdidaneb-rgb/Call
 
 ---
 
@@ -128,7 +128,7 @@ I built **Open Cold Dialer** — a browser-based SIP softphone using React, Type
 - Real-time call state updates
 - CSV parsing with PapaParse
 
-GitHub: https://github.com/6t9xstar/Open-Cold-Dialer
+GitHub: https://github.com/alegdidaneb-rgb/Call
 
 Would appreciate any feedback or contributions!
 
@@ -155,4 +155,4 @@ Built a full-stack TypeScript application — a cold calling CRM with SIP softph
 - JWT auth
 - REST API
 
-GitHub: https://github.com/6t9xstar/Open-Cold-Dialer
+GitHub: https://github.com/alegdidaneb-rgb/Call

@@ -8,9 +8,14 @@ services:
     volumes:
       - backend-data:/app/data
     environment:
+      - NODE_ENV=production
       - PORT=4000
-      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
-      - DATABASE_URL=file:./data/cold-dialer.db
+      # `${VAR:?message}` makes compose fail fast instead of booting the API with
+      # a published placeholder secret that anyone could use to forge tokens.
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set, e.g. `openssl rand -hex 32`}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
+      - DATABASE_PATH=/app/data/cold-dialer.db
     restart: unless-stopped
 
   frontend:

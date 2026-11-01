@@ -1,48 +1,91 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-const isConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
-function createNoOpTable() {
-  return {
-    select: () => ({ from: () => ({ order: () => Promise.resolve({ data: [], error: null, count: 0 }) }) }),
-    insert: () => ({ select: () => Promise.resolve({ data: [], error: null }) }),
-    update: () => ({ select: () => Promise.resolve({ data: [], error: null }) }),
-    delete: () => Promise.resolve({ data: [], error: null }),
-    on: () => ({ unsubscribe: () => {} }),
-  };
+const NOT_CONFIGURED_MESSAGE =
+  "Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY, " +
+  "or set VITE_API_URL to use the self-hosted backend.";
+
+/**
+ * Stand-in used when Supabase is not configured.
+ *
+ * Every data query is fully chainable (`.select().eq().order().single()`) and
+ * resolves to a real `error`, instead of the previous mock which only supported
+ * two fixed call chains and threw a TypeError on anything else. Surfacing an
+ * error means a misconfigured deployment shows a message rather than silently
+ * rendering empty tables that look like a successful load.
+ */
+function createUnconfiguredBuilder(): any {
+  const resolved = { data: null, error: { message: NOT_CONFIGURED_MESSAGE }, count: 0 };
+
+  const chain: any = new Proxy(function () {}, {
+    get(_target, prop) {
+      if (prop === "then") return (onFulfilled: (v: unknown) => unknown) => onFulfilled(resolved);
+      if (prop === "data") return resolved.data;
+      if (prop === "error") return resolved.error;
+      if (prop === "count") return resolved.count;
+      return chain;
+    },
+    apply() {
+      return chain;
+    },
+  });
+
+  return chain;
 }
 
-const mockSupabase = {
-  from: (_table: string) => createNoOpTable(),
-  auth: {
-    getSession: async () => ({ data: { session: null }, error: null }),
-    onAuthStateChange: (_cb: unknown) => ({ data: { subscription: { unsubscribe: () => {} } } }),
-    signInWithPassword: async () => ({ data: { user: null, session: null }, error: { message: "Not configured" } }),
-    signUp: async () => ({ data: { user: null, session: null }, error: { message: "Not configured" } }),
-    signOut: async () => ({ error: null }),
-  },
-  channel: () => ({
-    on: () => ({ unsubscribe: () => {} }),
-    subscribe: () => {},
-  }),
-  isConfigured,
+const noopSubscription = {
+  data: { subscription: { unsubscribe: () => {} } },
 };
 
-export const supabase = isConfigured
-  ? createClient(supabaseUrl, supabaseAnonKey, {
+const unconfiguredClient = {
+  from: (_table: string) => createUnconfiguredBuilder(),
+  channel: (_name: string) => ({
+    on: () => ({ subscribe: () => {} }),
+    subscribe: () => {},
+    unsubscribe: () => {},
+    send: () => {},
+  }),
+  removeChannel: async () => {},
+  auth: {
+    getSession: async () => ({ data: { session: null }, error: null }),
+    getUser: async () => ({ data: { user: null }, error: { message: NOT_CONFIGURED_MESSAGE } }),
+    onAuthStateChange: (_cb: unknown) => noopSubscription,
+    signInWithPassword: async () => ({
+      data: { user: null, session: null },
+      error: { message: NOT_CONFIGURED_MESSAGE },
+    }),
+    signUp: async () => ({
+      data: { user: null, session: null },
+      error: { message: NOT_CONFIGURED_MESSAGE },
+    }),
+    signOut: async () => ({ error: null }),
+  },
+  isConfigured: false,
+};
+
+/**
+ * Typed as a real SupabaseClient in both branches so that call sites keep full
+ * type inference instead of collapsing to `any`.
+ */
+export const supabase: SupabaseClient = isSupabaseConfigured
+  ? createClient(supabaseUrl!, supabaseAnonKey!, {
       auth: {
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: true,
       },
     })
-  : (mockSupabase as any);
+  : (unconfiguredClient as unknown as SupabaseClient);
 
-if (!isConfigured) {
-  console.warn(
-    "Missing Supabase environment variables. VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY must be set."
-  );
+// Preserve the runtime flag the rest of the app checks for.
+if (isSupabaseConfigured) {
+  (supabase as unknown as Record<string, unknown>).isConfigured = true;
+} else if (import.meta.env.PROD) {
+  console.error(`[supabase] ${NOT_CONFIGURED_MESSAGE}`);
+} else {
+  console.warn(`[supabase] ${NOT_CONFIGURED_MESSAGE}`);
 }

@@ -2,17 +2,22 @@ import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 
 export const profiles = sqliteTable("profiles", {
   id: text("id").primaryKey(),
-  email: text("email").notNull(),
+  email: text("email").notNull().unique(),
   fullName: text("full_name"),
+  /**
+   * bcrypt hash of the user's password. Kept in sync with the DDL in
+   * database.ts — without it, login has nothing to verify against.
+   */
+  passwordHash: text("password_hash"),
   role: text("role", { enum: ["admin", "agent", "manager"] })
     .notNull()
     .default("agent"),
   createdAt: text("created_at")
     .notNull()
-    .default(new Date().toISOString()),
+    .$defaultFn(() => new Date().toISOString()),
   updatedAt: text("updated_at")
     .notNull()
-    .default(new Date().toISOString()),
+    .$defaultFn(() => new Date().toISOString()),
 });
 
 export const campaigns = sqliteTable("campaigns", {
@@ -28,10 +33,10 @@ export const campaigns = sqliteTable("campaigns", {
   createdBy: text("created_by"),
   createdAt: text("created_at")
     .notNull()
-    .default(new Date().toISOString()),
+    .$defaultFn(() => new Date().toISOString()),
   updatedAt: text("updated_at")
     .notNull()
-    .default(new Date().toISOString()),
+    .$defaultFn(() => new Date().toISOString()),
 });
 
 export const leads = sqliteTable("leads", {
@@ -62,6 +67,7 @@ export const leads = sqliteTable("leads", {
   source: text("source"),
   campaignId: text("campaign_id"),
   assignedTo: text("assigned_to"),
+  createdBy: text("created_by"),
   tags: text("tags"),
   notes: text("notes"),
   dnc: integer("dnc", { mode: "boolean" }).notNull().default(false),
@@ -69,10 +75,10 @@ export const leads = sqliteTable("leads", {
   callCount: integer("call_count").notNull().default(0),
   createdAt: text("created_at")
     .notNull()
-    .default(new Date().toISOString()),
+    .$defaultFn(() => new Date().toISOString()),
   updatedAt: text("updated_at")
     .notNull()
-    .default(new Date().toISOString()),
+    .$defaultFn(() => new Date().toISOString()),
 });
 
 export const callScripts = sqliteTable("call_scripts", {
@@ -86,10 +92,10 @@ export const callScripts = sqliteTable("call_scripts", {
   isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
   createdAt: text("created_at")
     .notNull()
-    .default(new Date().toISOString()),
+    .$defaultFn(() => new Date().toISOString()),
   updatedAt: text("updated_at")
     .notNull()
-    .default(new Date().toISOString()),
+    .$defaultFn(() => new Date().toISOString()),
 });
 
 export const callLogs = sqliteTable("call_logs", {
@@ -120,7 +126,7 @@ export const callLogs = sqliteTable("call_logs", {
   endedAt: text("ended_at"),
   createdAt: text("created_at")
     .notNull()
-    .default(new Date().toISOString()),
+    .$defaultFn(() => new Date().toISOString()),
 });
 
 export const appointments = sqliteTable("appointments", {
@@ -140,10 +146,10 @@ export const appointments = sqliteTable("appointments", {
   notes: text("notes"),
   createdAt: text("created_at")
     .notNull()
-    .default(new Date().toISOString()),
+    .$defaultFn(() => new Date().toISOString()),
   updatedAt: text("updated_at")
     .notNull()
-    .default(new Date().toISOString()),
+    .$defaultFn(() => new Date().toISOString()),
 });
 
 export const dncList = sqliteTable("dnc_list", {
@@ -154,5 +160,5 @@ export const dncList = sqliteTable("dnc_list", {
   createdBy: text("created_by"),
   createdAt: text("created_at")
     .notNull()
-    .default(new Date().toISOString()),
+    .$defaultFn(() => new Date().toISOString()),
 });

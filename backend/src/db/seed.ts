@@ -52,10 +52,27 @@ function seed() {
   console.log("Seeding database...");
 
   const userId = uuid();
-  const passwordHash = bcrypt.hashSync("password123", 10);
+
+  /**
+   * The seeded admin password must be stored as a hash — earlier revisions
+   * computed `passwordHash` and then discarded it, leaving an account that
+   * could never be authenticated against.
+   */
+  const seedPassword = process.env.SEED_ADMIN_PASSWORD;
+  const usingDefaultPassword = !seedPassword;
+  const password = seedPassword || "password123";
+  const passwordHash = bcrypt.hashSync(password, 12);
+
   db.prepare(
-    "INSERT INTO profiles (id, email, full_name, role) VALUES (?, ?, ?, ?)"
-  ).run(userId, "admin@example.com", "Admin User", "admin");
+    "INSERT INTO profiles (id, email, full_name, password_hash, role) VALUES (?, ?, ?, ?, ?)"
+  ).run(userId, "admin@example.com", "Admin User", passwordHash, "admin");
+
+  if (usingDefaultPassword) {
+    console.warn(
+      "[seed] No SEED_ADMIN_PASSWORD set; admin@example.com was created with the well-known " +
+        "development password 'password123'. Set SEED_ADMIN_PASSWORD for anything non-local."
+    );
+  }
 
   const campaignIds: string[] = [];
   const campaignNames = ["Q1 Outreach", "Medical Practices NJ"];
@@ -100,8 +117,8 @@ function seed() {
     const campaignId = campaignIds[i % campaignIds.length];
 
     db.prepare(
-      `INSERT INTO leads (id, first_name, last_name, company, phone, email, city, state, zip, status, source, campaign_id, call_count, dnc)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'import', ?, ?, ?)`
+      `INSERT INTO leads (id, first_name, last_name, company, phone, email, city, state, zip, status, source, campaign_id, assigned_to, created_by, call_count, dnc)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'import', ?, ?, ?, ?, ?)`
     ).run(
       uuid(),
       firstName,
@@ -114,6 +131,8 @@ function seed() {
       location.zip,
       status,
       campaignId,
+      userId,
+      userId,
       Math.floor(Math.random() * 5),
       status === "do_not_contact" ? 1 : 0
     );

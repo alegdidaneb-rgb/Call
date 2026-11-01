@@ -7,11 +7,16 @@ services:
       - "4000:4000"
     volumes:
       - ./backend:/app
+      # Anonymous volume so the host bind mount above does not shadow the
+      # node_modules installed inside the image. Without this, `npm run dev`
+      # fails with "tsx: not found".
+      - /app/node_modules
       - ./data:/app/data
     environment:
+      - NODE_ENV=development
       - PORT=4000
-      - JWT_SECRET=dev-secret-change-in-production
-      - DATABASE_URL=file:./data/cold-dialer.db
+      - JWT_SECRET=${JWT_SECRET:-cold-dialer-INSECURE-LOCAL-DEV-ONLY-do-not-ship}
+      - DATABASE_PATH=/app/data/cold-dialer.db
     command: npm run dev
 
   frontend:
@@ -24,5 +29,7 @@ services:
       - ./frontend:/app
       - /app/node_modules
     environment:
-      - VITE_API_URL=http://localhost:4000
+      # Same-origin relative path; nginx/vite proxying keeps browser code from
+      # having to know the backend host.
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:4000}
     command: npm run dev

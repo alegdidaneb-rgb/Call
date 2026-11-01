@@ -1,8 +1,26 @@
 FROM node:20-alpine
+
+# better-sqlite3 is a native addon. Prebuilt binaries are not always available
+# for musl, so the toolchain needed to compile it is installed explicitly
+# rather than relying on `npm ci` succeeding by luck.
+RUN apk add --no-cache python3 make g++
+
 WORKDIR /app
+
 COPY backend/package*.json ./
 RUN npm ci
+
 COPY backend/ .
 RUN npm run build
+
+# The database lives in a mounted volume; create it as the runtime user.
+RUN mkdir -p /app/data && chown -R node:node /app
+USER node
+
+ENV NODE_ENV=production
 EXPOSE 4000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:4000/api/health || exit 1
+
 CMD ["node", "dist/index.js"]

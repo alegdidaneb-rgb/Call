@@ -49,7 +49,7 @@ SIP:       SIP.js (WebRTC)
 ### 1. Self-Hosted (Recommended)
 
 ```bash
-git clone https://github.com/6t9xstar/Open-Cold-Dialer.git
+git clone https://github.com/alegdidaneb-rgb/Call.git
 cd Open-Cold-Dialer
 
 # Backend
@@ -163,10 +163,10 @@ I'm working on these features:
 
 The project is open-source and ready to use:
 
-**GitHub:** [github.com/6t9xstar/Open-Cold-Dialer](https://github.com/6t9xstar/Open-Cold-Dialer)
+**GitHub:** [github.com/alegdidaneb-rgb/Call](https://github.com/alegdidaneb-rgb/Call)
 
 ```bash
-git clone https://github.com/6t9xstar/Open-Cold-Dialer.git
+git clone https://github.com/alegdidaneb-rgb/Call.git
 cd Open-Cold-Dialer/backend && npm install && npm run seed && npm run dev
 ```
 

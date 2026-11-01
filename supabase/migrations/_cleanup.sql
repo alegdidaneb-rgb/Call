@@ -1,24 +1,34 @@
-﻿DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-DROP POLICY IF EXISTS "DNC list is viewable by authenticated users" ON dnc_list;
-DROP POLICY IF EXISTS "DNC list is insertable by authenticated users" ON dnc_list;
-DROP POLICY IF EXISTS "Appointments are viewable by authenticated users" ON appointments;
-DROP POLICY IF EXISTS "Appointments are insertable by authenticated users" ON appointments;
-DROP POLICY IF EXISTS "Call logs are viewable by authenticated users" ON call_logs;
-DROP POLICY IF EXISTS "Call logs are insertable by authenticated users" ON call_logs;
-DROP POLICY IF EXISTS "Leads are viewable by authenticated users" ON leads;
-DROP POLICY IF EXISTS "Leads are insertable by authenticated users" ON leads;
-DROP POLICY IF EXISTS "Leads are updatable by the owner or admin" ON leads;
-DROP POLICY IF EXISTS "Campaigns are viewable by authenticated users" ON campaigns;
-DROP POLICY IF EXISTS "Campaigns are insertable by authenticated users" ON campaigns;
-DROP POLICY IF EXISTS "Campaigns are updatable by the creator or admin" ON campaigns;
-DROP POLICY IF EXISTS "Campaigns are deletable by admin" ON campaigns;
-DROP POLICY IF EXISTS "Profiles are viewable by authenticated users" ON profiles;
-DROP POLICY IF EXISTS "Profiles are updatable by the owner or admin" ON profiles;
+-- Destructive teardown for the Open Cold Dialer schema.
+--
+-- Drops everything created by 001_init.sql, including the RLS policies,
+-- triggers and helper functions. Run only against a database you intend to wipe.
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
-DROP TABLE IF EXISTS dnc_list CASCADE;
-DROP TABLE IF EXISTS appointments CASCADE;
-DROP TABLE IF EXISTS call_logs CASCADE;
-DROP TABLE IF EXISTS call_scripts CASCADE;
-DROP TABLE IF EXISTS leads CASCADE;
-DROP TABLE IF EXISTS campaigns CASCADE;
-DROP TABLE IF EXISTS profiles CASCADE;
+
+DROP TRIGGER IF EXISTS trg_profiles_updated_at ON public.profiles;
+DROP TRIGGER IF EXISTS trg_campaigns_updated_at ON public.campaigns;
+DROP TRIGGER IF EXISTS trg_leads_updated_at ON public.leads;
+DROP TRIGGER IF EXISTS trg_call_scripts_updated_at ON public.call_scripts;
+DROP TRIGGER IF EXISTS trg_appointments_updated_at ON public.appointments;
+DROP TRIGGER IF EXISTS trg_profiles_protect ON public.profiles;
+DROP TRIGGER IF EXISTS trg_call_logs_owner ON public.call_logs;
+DROP TRIGGER IF EXISTS trg_leads_created_by ON public.leads;
+DROP TRIGGER IF EXISTS trg_campaigns_created_by ON public.campaigns;
+DROP TRIGGER IF EXISTS trg_call_scripts_created_by ON public.call_scripts;
+
+DROP FUNCTION IF EXISTS public.set_updated_at() CASCADE;
+DROP FUNCTION IF EXISTS public.protect_profile_fields() CASCADE;
+DROP FUNCTION IF EXISTS public.normalize_call_log_owner() CASCADE;
+DROP FUNCTION IF EXISTS public.normalize_created_by() CASCADE;
+
+DROP TABLE IF EXISTS public.dnc_list CASCADE;
+DROP TABLE IF EXISTS public.appointments CASCADE;
+DROP TABLE IF EXISTS public.call_logs CASCADE;
+DROP TABLE IF EXISTS public.call_scripts CASCADE;
+DROP TABLE IF EXISTS public.leads CASCADE;
+DROP TABLE IF EXISTS public.campaigns CASCADE;
+DROP TABLE IF EXISTS public.profiles CASCADE;
+
+DROP FUNCTION IF EXISTS public.is_admin() CASCADE;
+DROP FUNCTION IF EXISTS public.is_privileged() CASCADE;

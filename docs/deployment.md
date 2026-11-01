@@ -6,7 +6,7 @@
 
 ```bash
 # Clone and configure
-git clone https://github.com/6t9xstar/cold-dailer.git
+git clone https://github.com/alegdidaneb-rgb/Call.git
 cd cold-dialer
 cp .env.example .env.local
 
@@ -44,7 +44,7 @@ curl -fsSL https://get.docker.com -o get-docker.sh
 sh get-docker.sh
 
 # Clone project
-git clone https://github.com/6t9xstar/cold-dailer.git
+git clone https://github.com/alegdidaneb-rgb/Call.git
 cd cold-dailer
 
 # Configure

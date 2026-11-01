@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Layout } from "@/components/common/Layout";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
+import type { AppRole } from "@/types/app";
 
 const LoginPage = React.lazy(() => import("@/pages/LoginPage").then((m) => ({ default: m.LoginPage })));
 const SignupPage = React.lazy(() => import("@/pages/SignupPage").then((m) => ({ default: m.SignupPage })));
@@ -37,6 +38,24 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/**
+ * Role gate for privileged screens.
+ *
+ * The `/admin` route was previously reachable by any signed-in user. This is a
+ * UI-level control only -- the API and the Supabase RLS policies are what
+ * actually enforce authorisation.
+ */
+function RequireRole({ roles, children }: { roles: AppRole[]; children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  if (loading) {
+    return <PageSpinner />;
+  }
+  if (!user || !roles.includes(user.role)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return <>{children}</>;
+}
+
 function AppRoutes() {
   return (
     <Routes>
@@ -56,7 +75,14 @@ function AppRoutes() {
                   <Route path="campaigns" element={<CampaignPage />} />
                   <Route path="scripts" element={<ScriptsPage />} />
                   <Route path="history" element={<CallHistoryPage />} />
-                  <Route path="admin" element={<AdminPage />} />
+                  <Route
+                    path="admin"
+                    element={
+                      <RequireRole roles={["admin"]}>
+                        <AdminPage />
+                      </RequireRole>
+                    }
+                  />
                 </Routes>
               </Suspense>
             </Layout>
