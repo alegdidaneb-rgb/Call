@@ -25,6 +25,7 @@ db.exec(`
     full_name TEXT,
     password_hash TEXT,
     role TEXT NOT NULL DEFAULT 'agent' CHECK (role IN ('admin', 'agent', 'manager')),
+    invited_by TEXT REFERENCES profiles(id) ON DELETE SET NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
@@ -148,6 +149,27 @@ function migrate(): void {
     console.warn(
       "[db] Added missing profiles.password_hash column. Existing accounts have no stored " +
         "password and must be re-registered or have a hash set manually."
+    );
+  }
+
+  if (!columnExists("profiles", "invited_by")) {
+    db.exec(
+      "ALTER TABLE profiles ADD COLUMN invited_by TEXT REFERENCES profiles(id) ON DELETE SET NULL"
+    );
+    db.exec("CREATE INDEX IF NOT EXISTS idx_profiles_invited_by ON profiles(invited_by)");
+    // Accounts that predate provisioning were created before it was tracked.
+    // Adopt them under the first admin rather than locking out a live team, and
+    // let privileged accounts stand on their own role.
+    db.exec(
+      "UPDATE profiles SET invited_by = (SELECT id FROM profiles WHERE role = 'admin' " +
+        "ORDER BY created_at LIMIT 1) WHERE invited_by IS NULL AND role = 'agent'"
+    );
+    db.exec(
+      "UPDATE profiles SET invited_by = id WHERE invited_by IS NULL AND role IN ('admin','manager')"
+    );
+    console.warn(
+      "[db] Added missing profiles.invited_by column. Accounts are now provisioned " +
+        "explicitly; unprovisioned agents have no data access."
     );
   }
 

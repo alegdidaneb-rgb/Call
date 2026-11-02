@@ -2,11 +2,11 @@ import { Router } from "express";
 import { v4 as uuid } from "uuid";
 import { z } from "zod";
 import db from "../db/database.js";
-import { authMiddleware, requireRole, isAdmin, type AuthRequest } from "../middleware/auth.js";
+import { authMiddleware, requireProvisioned, requireRole, isAdmin, type AuthRequest } from "../middleware/auth.js";
 import { MAX_IMPORT_ROWS } from "../config/env.js";
 
 const router = Router();
-router.use(authMiddleware);
+router.use(authMiddleware, requireProvisioned);
 
 const LEAD_STATUSES = [
   "new",

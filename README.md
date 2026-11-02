@@ -168,9 +168,12 @@ Open-Cold-Dialer/
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | /api/auth/signup | Create account |
 | POST | /api/auth/login | Sign in |
 | GET | /api/auth/me | Get current user |
+| GET | /api/auth/status | Whether first-run setup is still available |
+| POST | /api/auth/bootstrap | Create the first admin (empty database only) |
+| GET | /api/users | List accounts *(admin)* |
+| POST | /api/users | Create an account *(admin)* |
 | GET | /api/leads | List leads |
 | POST | /api/leads | Create lead |
 | PATCH | /api/leads/:id | Update lead |
@@ -228,13 +231,19 @@ The frontend is a static Vite SPA, so it hosts on Vercel. Persistence and auth c
 from Supabase, and **Row Level Security is the access control layer** — see
 [SECURITY.md](SECURITY.md).
 
-1. **Supabase** — apply `supabase/migrations/001_init.sql` to your project (SQL
-   editor, or `supabase db push`). This enables RLS on every table.
-2. **First account** — sign up through the app. The first profile created is
-   automatically granted the `admin` role; every account after that is an `agent`.
-3. **Vercel** — import this repository and set Root directory `frontend`, Framework
+1. **Supabase** — apply both files in `supabase/migrations/` in order (SQL editor,
+   or `supabase db push`). `001_init.sql` creates the schema and enables RLS on
+   every table; `002_admin_only_users.sql` makes account creation admin-only.
+2. **Edge function** — deploy `supabase/functions/admin-users` (`supabase functions
+   deploy admin-users --no-verify-jwt`). It holds the service role key server-side
+   and is the only thing that can create an account.
+3. **First account** — open `/setup` and create the first administrator. That
+   screen works only while the database has no accounts; the server rejects it
+   afterwards. There is **no public sign-up** — from then on every account is
+   created by an admin from **Team**.
+4. **Vercel** — import this repository and set Root directory `frontend`, Framework
    `vite`, Build command `npm run build`, Output directory `dist`.
-4. **Environment variables** (Vercel → Project → Settings → Environment Variables):
+5. **Environment variables** (Vercel → Project → Settings → Environment Variables):
 
    | Key | Value |
    |---|---|

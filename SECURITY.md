@@ -48,8 +48,11 @@ Never ship the `service_role` or `sb_secret_*` key to the browser. Only
   repository's history. See `backend/src/config/env.ts`.
 - Passwords are stored as bcrypt hashes (`BCRYPT_ROUNDS`, default 12) in
   `profiles.password_hash`. The hash is never returned by any endpoint.
-- Login and signup are rate limited (20 requests / 15 min per IP), and failed
-  logins return a generic message with uniform timing.
+- Login is rate limited (20 requests / 15 min per IP), and failed logins return
+  a generic message with uniform timing. There is no public signup endpoint.
+- Data routes additionally require `requireProvisioned`, so an account that
+  authenticated but was never created by an administrator gets `403` rather than
+  an empty result set that looks like a successful load.
 - Allowed browser origins come from `CORS_ORIGINS`; credentials are not sent.
 - Every route is scoped to the authenticated user, and destructive operations
   (`DELETE /leads/:id`, `DELETE /campaigns/:id`, `DELETE /scripts/:id`) require
@@ -76,6 +79,47 @@ Never commit these files (they are git-ignored):
 - `backend/data/*.db` (contains password hashes and lead PII)
 
 Use `.env.example` and `backend/.env.example` as templates.
+
+## User Provisioning
+
+There is no public sign-up. An account exists only because an administrator
+created it, and this is enforced at three independent layers so that removing any
+one of them does not reopen registration.
+
+1. **No client path.** `SignupPage` and `auth.signUp` are gone. The only
+   provisioning UI is `/team`, route-guarded to `admin`.
+2. **Server-side authorisation.** Creating a Supabase user needs the service role
+   key, which lives only in the `admin-users` edge function. That function
+   verifies the caller's JWT and requires `profiles.role = 'admin'` before it will
+   create anything; a non-admin calling it directly gets `403`. The self-hosted
+   backend mirrors this with `POST /api/users` behind `requireRole("admin")`.
+3. **Database.** `profiles.invited_by` records who onboarded an account. Every
+   agent-facing RLS policy is gated on `public.is_provisioned()`, and
+   `protect_profile_fields()` stops a non-admin from changing `role` or
+   `invited_by` — including on their own row.
+
+The consequence is that an account created by calling `auth.signUp()` directly
+with the public anon key **authenticates but can read nothing**: `role = 'agent'`,
+`invited_by = null`, zero rows from every table. Verified against the live
+database — such an account saw 0 of 1 unassigned leads, its attempt to set
+`role = 'admin'` and `invited_by` on its own profile was reverted by the trigger,
+and once an administrator set `invited_by` the same account saw the lead pool.
+
+**Why not just set Supabase's `disable_signup`?** This project's Supabase instance
+is shared with another application, and that flag is global — turning it off would
+break the other application's registration too. The database-level control above
+achieves the same guarantee for Cold Dialer without touching shared
+configuration. If Cold Dialer ever moves to its own project, set
+`disable_signup = true` as well; it is defence in depth, not a replacement.
+
+**First-run bootstrap.** `/setup` creates the first administrator and is refused
+by the server as soon as any account exists, so it cannot mint a second admin.
+Provision a fresh deployment promptly: while `profiles` is empty, bootstrap is
+open to anyone who can reach the site.
+
+**Handover.** Accounts are created already confirmed, with a temporary password
+the admin sets. There is no email confirmation step, so the password must be
+passed over a secure channel and rotated by the new user.
 
 ## Dependency Advisories
 

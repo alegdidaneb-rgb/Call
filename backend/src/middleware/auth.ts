@@ -9,12 +9,15 @@ export interface AuthRequest extends Request {
   userId?: string;
   userRole?: Role;
   userEmail?: string;
+  /** Whether an administrator has onboarded this account. */
+  userProvisioned?: boolean;
 }
 
 interface ProfileRow {
   id: string;
   email: string;
   role: Role;
+  invited_by: string | null;
 }
 
 export function generateToken(userId: string): string {
@@ -53,7 +56,7 @@ export function authMiddleware(req: AuthRequest, res: Response, next: NextFuncti
   }
 
   const profile = db
-    .prepare("SELECT id, email, role FROM profiles WHERE id = ?")
+    .prepare("SELECT id, email, role, invited_by FROM profiles WHERE id = ?")
     .get(payload.userId) as ProfileRow | undefined;
 
   if (!profile) {
@@ -65,6 +68,10 @@ export function authMiddleware(req: AuthRequest, res: Response, next: NextFuncti
   req.userId = profile.id;
   req.userRole = profile.role;
   req.userEmail = profile.email;
+  // Mirrors the database predicate `public.is_provisioned()`: privileged roles
+  // are provisioned by definition, an agent only once an admin has adopted it.
+  req.userProvisioned =
+    profile.role === "admin" || profile.role === "manager" || profile.invited_by !== null;
   next();
 }
 
@@ -85,6 +92,33 @@ export function requireRole(...roles: Role[]): RequestHandler {
     next();
   };
 }
+
+/**
+ * Blocks accounts that were never provisioned by an administrator.
+ *
+ * Such an account can authenticate -- its credentials are valid -- but under the
+ * Supabase RLS policies it can read no rows at all. Enforcing the same rule here
+ * keeps the self-hosted backend from being the more permissive of the two paths.
+ * Must run after authMiddleware.
+ */
+export const requireProvisioned: RequestHandler = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  const authed = req as AuthRequest;
+  if (!authed.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  if (!authed.userProvisioned) {
+    res.status(403).json({
+      error: "This account has not been given access yet. Ask an administrator to add you.",
+    });
+    return;
+  }
+  next();
+};
 
 export function isAdmin(req: AuthRequest): boolean {
   return req.userRole === "admin";

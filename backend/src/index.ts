@@ -7,6 +7,7 @@ import leadsRoutes from "./routes/leads.js";
 import campaignsRoutes from "./routes/campaigns.js";
 import callLogsRoutes from "./routes/callLogs.js";
 import scriptsRoutes from "./routes/scripts.js";
+import usersRoutes from "./routes/users.js";
 import { PORT, CORS_ORIGINS, BODY_LIMIT, NODE_ENV } from "./config/env.js";
 
 const app = express();
@@ -60,6 +61,7 @@ app.use("/api/leads", leadsRoutes);
 app.use("/api/campaigns", campaignsRoutes);
 app.use("/api/call-logs", callLogsRoutes);
 app.use("/api/scripts", scriptsRoutes);
+app.use("/api/users", usersRoutes);
 
 app.use("/api", (_req: Request, res: Response) => {
   res.status(404).json({ error: "Endpoint not found" });

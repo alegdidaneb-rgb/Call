@@ -8,6 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Admin-only account provisioning: `admin-users` Supabase edge function,
+  `POST /api/users` in the self-hosted backend, and a Team page for administrators
+- First-run `/setup` screen, closed by the server once any account exists
+- `profiles.invited_by` plus `is_provisioned()` / `is_service_role()` in Postgres,
+  and a matching `requireProvisioned` middleware in the backend
+- "Waiting for an administrator" screen for accounts that authenticated without
+  being provisioned
+
+### Removed
+- Public self-service sign-up: `SignupPage`, `auth.signUp`, `POST /api/auth/signup`,
+  and the unused `multer`, `papaparse` and Drizzle dependencies
+
+### Changed
+- Every agent-facing RLS policy now requires the caller to be provisioned, so an
+  account created directly through the Supabase Auth API can read nothing
+- New auth users are no longer auto-promoted: the first-admin bootstrap is now an
+  explicit server-side action instead of a race on an empty table
 - Self-hosted backend with SQLite database
 - Express.js API server with JWT authentication
 - Provider abstraction layer (Supabase or self-hosted backend)

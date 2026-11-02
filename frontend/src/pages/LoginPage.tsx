@@ -1,7 +1,7 @@
-import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { signIn } from "@/lib/auth";
-import { LogIn, Mail, Lock, AlertCircle } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { fetchSetupStatus, signIn } from "@/lib/auth";
+import { LogIn, Mail, Lock, AlertCircle, CheckCircle2 } from "lucide-react";
 import { z } from "zod";
 
 const loginSchema = z.object({
@@ -11,11 +11,25 @@ const loginSchema = z.object({
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const justCreated = Boolean((location.state as { created?: boolean } | null)?.created);
+  /** Only a deployment with no accounts at all offers the setup screen. */
+  const [needsSetup, setNeedsSetup] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let active = true;
+    void fetchSetupStatus().then((status) => {
+      if (active) setNeedsSetup(status.needsSetup);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -53,6 +67,13 @@ export function LoginPage() {
         </div>
         <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-lg p-8 space-y-5">
           <h2 className="text-xl font-semibold text-gray-800">Sign In</h2>
+          {justCreated && (
+            <div className="flex items-start gap-2 rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-800">
+              <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>Administrator created. Sign in with the email and password you just set.</span>
+            </div>
+          )}
+
           {error && (
             <div className="flex items-center gap-2 text-red-600 bg-red-50 p-3 rounded-lg text-sm">
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -101,12 +122,18 @@ export function LoginPage() {
               </>
             )}
           </button>
-          <p className="text-center text-sm text-gray-500">
-            Don't have an account?{" "}
-            <Link to="/signup" className="font-medium text-brand-600 hover:text-brand-700">
-              Create one
-            </Link>
-          </p>
+          {needsSetup ? (
+            <p className="text-center text-sm text-gray-500">
+              No accounts yet?{" "}
+              <Link to="/setup" className="font-medium text-brand-600 hover:text-brand-700">
+                Set up this deployment
+              </Link>
+            </p>
+          ) : (
+            <p className="text-center text-sm text-gray-500">
+              Accounts are created by an administrator.
+            </p>
+          )}
         </form>
       </div>
     </div>

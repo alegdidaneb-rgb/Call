@@ -2,10 +2,10 @@ import { Router } from "express";
 import { v4 as uuid } from "uuid";
 import { z } from "zod";
 import db from "../db/database.js";
-import { authMiddleware, requireRole, isAdmin, type AuthRequest } from "../middleware/auth.js";
+import { authMiddleware, requireProvisioned, requireRole, isAdmin, type AuthRequest } from "../middleware/auth.js";
 
 const router = Router();
-router.use(authMiddleware);
+router.use(authMiddleware, requireProvisioned);
 
 const objectionSchema = z
   .record(

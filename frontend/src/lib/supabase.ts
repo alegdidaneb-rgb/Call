@@ -50,15 +50,20 @@ const unconfiguredClient = {
     send: () => {},
   }),
   removeChannel: async () => {},
+  // Edge functions are how an administrator provisions accounts; the stub keeps
+  // a misconfigured deployment reporting the same message instead of throwing a
+  // TypeError on `.functions.invoke`.
+  functions: {
+    invoke: async (_fn: string, _opts?: unknown) => ({
+      data: null,
+      error: { message: NOT_CONFIGURED_MESSAGE },
+    }),
+  },
   auth: {
     getSession: async () => ({ data: { session: null }, error: null }),
     getUser: async () => ({ data: { user: null }, error: { message: NOT_CONFIGURED_MESSAGE } }),
     onAuthStateChange: (_cb: unknown) => noopSubscription,
     signInWithPassword: async () => ({
-      data: { user: null, session: null },
-      error: { message: NOT_CONFIGURED_MESSAGE },
-    }),
-    signUp: async () => ({
       data: { user: null, session: null },
       error: { message: NOT_CONFIGURED_MESSAGE },
     }),

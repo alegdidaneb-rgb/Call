@@ -41,8 +41,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 export const api = {
   auth: {
-    signup: (email: string, password: string, fullName: string) =>
-      request<{ user: any; token: string }>("/api/auth/signup", {
+    /** Whether the deployment still needs its first administrator. */
+    status: () => request<{ needsSetup: boolean }>("/api/auth/status"),
+    /** First-run bootstrap; the server refuses once any account exists. */
+    bootstrap: (email: string, password: string, fullName: string) =>
+      request<{ user: any }>("/api/auth/bootstrap", {
         method: "POST",
         body: JSON.stringify({ email, password, fullName }),
       }),
@@ -52,6 +55,13 @@ export const api = {
         body: JSON.stringify({ email, password }),
       }),
     me: () => request<any>("/api/auth/me"),
+  },
+
+  /** Administrator-only account management. */
+  users: {
+    list: () => request<any[]>("/api/users"),
+    create: (data: { email: string; password: string; fullName: string; role: string }) =>
+      request<{ user: any }>("/api/users", { method: "POST", body: JSON.stringify(data) }),
   },
 
   leads: {

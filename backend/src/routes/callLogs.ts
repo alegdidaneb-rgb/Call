@@ -2,10 +2,10 @@ import { Router } from "express";
 import { v4 as uuid } from "uuid";
 import { z } from "zod";
 import db from "../db/database.js";
-import { authMiddleware, isAdmin, type AuthRequest } from "../middleware/auth.js";
+import { authMiddleware, requireProvisioned, isAdmin, type AuthRequest } from "../middleware/auth.js";
 
 const router = Router();
-router.use(authMiddleware);
+router.use(authMiddleware, requireProvisioned);
 
 const callLogSchema = z.object({
   lead_id: z.string().uuid().nullish(),

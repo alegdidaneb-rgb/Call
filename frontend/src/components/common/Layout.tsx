@@ -16,6 +16,7 @@ import {
   FileText,
   Bell,
   Search,
+  UserPlus,
 } from "lucide-react";
 
 interface NavItem {
@@ -32,6 +33,7 @@ const navItems: NavItem[] = [
   { to: "/campaigns", label: "Campaigns", icon: Target },
   { to: "/scripts", label: "Scripts", icon: FileText },
   { to: "/history", label: "Call History", icon: Clock },
+  { to: "/team", label: "Team", icon: UserPlus, roles: ["admin"] },
   { to: "/admin", label: "Admin", icon: Shield, roles: ["admin"] },
 ];
 
