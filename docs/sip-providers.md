@@ -73,16 +73,132 @@ standard SIP and does not use it.
 - SIP URI: `sip:<username>@<your-domain>.sip.twilio.com`
 - WebSocket URL: `wss://<your-domain>.sip.twilio.com`
 
-### Asterisk, FreeSWITCH, 3CX and other PBXs
+### Your own PBX: Asterisk, FreeSWITCH, 3CX
 
-Enable the WebSocket transport and a WSS listener, then create an extension with
-`webrtc=yes` (Asterisk) or the equivalent.
+A PBX has three settings that decide whether a browser can register, and getting
+any one of them wrong produces the same vague symptom: the softphone reports
+*"Could not reach the SIP server"* or *"The server did not confirm
+registration"*. Work through them in this order.
 
-- SIP URI: `sip:<extension>@<pbx-host>`
-- WebSocket URL: `wss://<pbx-host>:8089/ws` (Asterisk's default `ws` path)
+#### 1. The WebSocket endpoint must have a certificate the browser trusts
 
-A self-signed certificate will fail silently in the browser. Serve the PBX's
-WebSocket endpoint from a certificate the browser already trusts.
+This is the failure that wastes the most time. A browser refuses a `wss://`
+connection whose certificate it does not trust, and it does so **silently** — SIP.js
+sees only a socket that never opened, so the app cannot tell "self-signed
+certificate" apart from "nothing listening".
+
+Self-signed will not work. Either issue a real certificate for the PBX (Let's
+Encrypt is free), or terminate TLS at a reverse proxy in front of it. The proxy
+is usually easier, because it also gives you a stable hostname:
+
+```
+# Caddyfile -- Caddy obtains and renews the certificate automatically
+# and proxies WebSocket upgrades without extra configuration.
+sip.example.com {
+    reverse_proxy /ws* 127.0.0.1:8088
+}
+```
+
+The WebSocket URL you then enter in the app is `wss://sip.example.com/ws`.
+
+Verify the endpoint from a browser tab before touching the app: opening
+`https://sip.example.com/ws` should not produce a certificate warning. If it
+does, no browser softphone will ever connect.
+
+#### 2. The extension must be WebRTC-capable
+
+A plain SIP extension negotiates RTP in the clear. A browser only offers
+DTLS-SRTP with ICE and RTCP multiplexing, so an extension configured for
+ordinary desk phones will register and then fail to carry audio.
+
+**Asterisk** (PJSIP). Enable TLS on the built-in HTTP server, add a `ws`
+transport, and set `webrtc=yes` on the endpoint — that one line turns on
+DTLS-SRTP, ICE, RTCP-mux and AVPF together:
+
+```ini
+; http.conf
+[general]
+enabled = yes
+bindaddr = 0.0.0.0
+bindport = 8088
+tlsenable = yes
+tlsbindaddr = 0.0.0.0:8089
+tlscertfile = /etc/letsencrypt/live/sip.example.com/fullchain.pem
+tlsprivatekey = /etc/letsencrypt/live/sip.example.com/privkey.pem
+
+; pjsip.conf
+[transport-wss]
+type = transport
+protocol = ws
+bind = 0.0.0.0
+
+[1001]
+type = endpoint
+context = from-internal
+transport = transport-wss
+auth = auth-1001
+aors = 1001
+webrtc = yes
+disallow = all
+allow = opus
+allow = ulaw
+
+[auth-1001]
+type = auth
+auth_type = userpass
+username = 1001
+password = <a strong password>
+
+[1001]
+type = aor
+max_contacts = 5
+remove_existing = yes
+```
+
+**FreeSWITCH.** The internal profile listens for WSS on port 7443 by default;
+confirm `wss-binding` is set and that `/etc/freeswitch/tls/wss.pem` holds a
+trusted certificate rather than the shipped self-signed one.
+
+**3CX.** Its own web client uses WebRTC, but a *third-party* browser softphone is
+a different matter and several editions restrict which clients may register. If
+**Test connection** never confirms registration on 3CX, check whether the
+extension is allowed to use a generic SIP client at all before debugging further.
+
+#### 3. The dialplan must route numbers in international format
+
+The app dials `sip:+393406729832@your-pbx`, derived from the lead's country.
+Registration succeeding only proves you can talk to the PBX; the call still has
+to be routed.
+
+Many default dialplans match national formats or expect an outbound trunk prefix
+such as `9` or `00`, and will reject a leading `+` with `404 Not Found` or simply
+ring nothing at all. Add a route that matches E.164 and strips the `+` before
+handing the call to your trunk — in Asterisk, something like:
+
+```ini
+; extensions.conf
+[from-internal]
+exten => _+X.,1,NoOp(Outbound E.164 call to ${EXTEN})
+ same => n,Dial(PJSIP/outbound-trunk/${EXTEN:1})
+```
+
+If you cannot change the dialplan, say so and an outbound prefix option can be
+added to the app instead.
+
+#### Codecs
+
+Browsers offer Opus, G.711 (PCMU/PCMA) and G.722. If the extension is restricted
+to something a browser cannot do — G.729 is the usual culprit — the call connects
+with no audio or fails at INVITE. Allow Opus or ulaw.
+
+#### NAT
+
+Media flows directly between the browser and the PBX. If the PBX is behind NAT it
+needs its external addresses declared (`external_signaling_address` and
+`external_media_address` on the Asterisk transport), or ICE will negotiate an
+address the browser cannot reach and the call will be silent in one or both
+directions. The app sends Google's public STUN servers by default, which covers
+the browser side.
 
 ## When a call does not work
 
