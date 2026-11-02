@@ -20,6 +20,25 @@ const LEAD_STATUSES = [
 
 const optionalString = (max = 500) => z.string().trim().max(max).nullish();
 
+/**
+ * ISO 3166-1 alpha-2 country code.
+ *
+ * Accepts the shapes a CSV or a hand-typed form produces ("us", " US ", "") and
+ * normalises them, mirroring the `normalize_lead_country` trigger on the
+ * Supabase side so both backends store the same thing. The two-letter format is
+ * enforced here because SQLite has no CHECK constraint for it.
+ */
+const optionalCountry = z
+  .union([z.string(), z.null(), z.undefined()])
+  .transform((value) => {
+    if (value === null || value === undefined) return null;
+    const text = String(value).trim().toUpperCase();
+    return text === "" ? null : text;
+  })
+  .refine((value) => value === null || /^[A-Z]{2}$/.test(value), {
+    message: "Country must be a two-letter ISO 3166-1 code",
+  });
+
 const leadCreateSchema = z.object({
   first_name: optionalString(120),
   last_name: optionalString(120),
@@ -31,6 +50,7 @@ const leadCreateSchema = z.object({
   city: optionalString(120),
   state: optionalString(120),
   zip: optionalString(20),
+  country: optionalCountry,
   status: z.enum(LEAD_STATUSES).nullish(),
   source: optionalString(120),
   campaign_id: z.string().uuid().nullish(),
@@ -83,6 +103,7 @@ function mapLead(row: any) {
     city: row.city,
     state: row.state,
     zip: row.zip,
+    country: row.country,
     status: row.status,
     source: row.source,
     campaign_id: row.campaign_id,
@@ -142,8 +163,8 @@ router.post("/", (req: AuthRequest, res) => {
 
   try {
     db.prepare(
-      `INSERT INTO leads (id, first_name, last_name, company, phone, email, website, address, city, state, zip, status, source, campaign_id, assigned_to, created_by, tags, notes, dnc, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO leads (id, first_name, last_name, company, phone, email, website, address, city, state, zip, country, status, source, campaign_id, assigned_to, created_by, tags, notes, dnc, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       id,
       lead.first_name ?? null,
@@ -156,6 +177,7 @@ router.post("/", (req: AuthRequest, res) => {
       lead.city ?? null,
       lead.state ?? null,
       lead.zip ?? null,
+      lead.country ?? null,
       lead.status ?? "new",
       lead.source ?? null,
       lead.campaign_id ?? null,
@@ -197,7 +219,7 @@ router.patch("/:id", (req: AuthRequest, res) => {
   // Column names come from this fixed allowlist, never from the request body.
   const fields = [
     "first_name", "last_name", "company", "phone", "email", "website",
-    "address", "city", "state", "zip", "status", "source", "campaign_id",
+    "address", "city", "state", "zip", "country", "status", "source", "campaign_id",
     "assigned_to", "tags", "notes", "dnc", "last_called_at", "call_count",
   ] as const;
 
@@ -263,6 +285,7 @@ const importRowSchema = z.object({
   city: optionalString(120),
   state: optionalString(120),
   zip: optionalString(20),
+  country: optionalCountry,
   status: z.enum(LEAD_STATUSES).nullish(),
   source: optionalString(120),
 });
@@ -299,8 +322,8 @@ router.post("/import", (req: AuthRequest, res) => {
   const { rows, campaign_id } = parsed.data;
 
   const insert = db.prepare(
-    `INSERT INTO leads (id, first_name, last_name, company, phone, email, website, address, city, state, zip, status, source, campaign_id, assigned_to, created_by, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`
+    `INSERT INTO leads (id, first_name, last_name, company, phone, email, website, address, city, state, zip, country, status, source, campaign_id, assigned_to, created_by, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`
   );
 
   /**
@@ -326,6 +349,7 @@ router.post("/import", (req: AuthRequest, res) => {
           row.city ?? null,
           row.state ?? null,
           row.zip ?? null,
+          row.country ?? null,
           row.status ?? "new",
           row.source ?? "import",
           campaign_id ?? null,

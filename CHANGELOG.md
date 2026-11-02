@@ -8,6 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- International leads: `leads.country` (ISO 3166-1 alpha-2) in both the Supabase
+  and SQLite schemas, a 250-country picker in the lead form, and a country column
+  on the lead detail view
+- `scripts/generate-countries.mjs` plus `npm run gen:countries`, which generates
+  the committed country table from the ISO 3166-1 `world-countries` dataset
+- `country` accepted in CSV imports and normalised (`"gb"` -> `GB`, `""` -> NULL)
+  by a trigger in Postgres and by validation in the backend
+
+### Changed
+- The lead form's dialling prefix is derived from the selected country instead of
+  being a separate control that offered only "+1 (US)"
+- Lead address fields relabelled "State / Region" and "Postal code"
+
+### Added
 - Admin-only account provisioning: `admin-users` Supabase edge function,
   `POST /api/users` in the self-hosted backend, and a Team page for administrators
 - First-run `/setup` screen, closed by the server once any account exists

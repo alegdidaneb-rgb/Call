@@ -87,6 +87,8 @@ export type Database = {
           city: string | null;
           state: string | null;
           zip: string | null;
+          /** ISO 3166-1 alpha-2 code; null for leads saved before it existed. */
+          country: string | null;
           status: "new" | "contacted" | "interested" | "not_interested" | "callback" | "converted" | "do_not_contact";
           source: string | null;
           campaign_id: string | null;
@@ -111,6 +113,7 @@ export type Database = {
           city?: string | null;
           state?: string | null;
           zip?: string | null;
+          country?: string | null;
           status?: "new" | "contacted" | "interested" | "not_interested" | "callback" | "converted" | "do_not_contact";
           source?: string | null;
           campaign_id?: string | null;
@@ -134,6 +137,7 @@ export type Database = {
           city?: string | null;
           state?: string | null;
           zip?: string | null;
+          country?: string | null;
           status?: "new" | "contacted" | "interested" | "not_interested" | "callback" | "converted" | "do_not_contact";
           source?: string | null;
           campaign_id?: string | null;

@@ -11,6 +11,7 @@
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
     "seed": "npm --prefix backend run seed",
+    "gen:countries": "node scripts/generate-countries.mjs",
     "build": "npm --prefix backend run build && npm --prefix frontend run build",
     "lint": "npm --prefix backend run lint && npm --prefix frontend exec tsc -- --noEmit",
     "start": "npm --prefix backend run start"

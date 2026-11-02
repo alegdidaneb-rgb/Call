@@ -44,7 +44,8 @@ A free, open-source browser-based cold calling dialer with SIP support. No insta
 
 - **Browser Softphone** — SIP.js integration, no desktop app needed
 - **Multi-Provider SIP** — Works with SignalWire, Telnyx, Twilio, or any SIP server
-- **Lead Management** — CRUD, CSV import, search, filter by status
+- **Lead Management** — CRUD, CSV import, search, filter by status, international
+  addresses (250 countries, dialling codes derived from the country)
 - **Campaign Management** — Create and track outbound calling campaigns
 - **Call Scripts** — Script templates with objection handling responses
 - **Call History** — Log every call with outcome, duration, and notes
@@ -107,6 +108,36 @@ npm run dev
 ```
 
 ---
+
+## Countries and Dialling Codes
+
+`leads.country` holds an ISO 3166-1 alpha-2 code (`GB`, `US`, `AE`). The dialling
+prefix is derived from it, so the two can never disagree — there is no separate
+prefix control to set incorrectly.
+
+The country list is **generated, not hand-written**: `scripts/generate-countries.mjs`
+reads the [`world-countries`](https://www.npmjs.com/package/world-countries) ISO
+3166-1 dataset and emits `frontend/src/data/countries.ts`. That package is ~20 MB
+unpacked, so it is a build-time source rather than a dependency; the generated
+module is committed and Vite code-splits it into its own ~18 KB chunk that only
+loads with the lead screens.
+
+```bash
+npm i --no-save world-countries   # deliberately not in package.json
+npm run gen:countries
+```
+
+Regenerate when a country is renamed, gains independence, or is reassigned a
+dialling code.
+
+Dialling prefixes are shared, and the generator resolves them by preferring the
+single sovereign UN member state in each group: `+44` resolves to the United
+Kingdom rather than Guernsey, Jersey or the Isle of Man, and `+61` to Australia
+rather than Christmas Island. Where several sovereign states genuinely share a
+prefix — `+1` (the US, Canada and the Caribbean) and `+7` (Russia and Kazakhstan)
+— nothing is guessed. That matters because leads saved before `country` existed
+have it inferred from the stored number, and a wrong country on a calling list is
+a compliance problem, not a cosmetic one.
 
 ## SIP Configuration
 

@@ -12,7 +12,12 @@ Thumbs.db
 .idea/
 *.tsbuildinfo
 supabase/.temp/
-data/
+# SQLite database directories. Anchored on purpose: an unanchored `data/` also
+# swallowed source folders such as frontend/src/data/, silently keeping generated
+# modules out of the repository. The runtime default is backend/data (see
+# DATA_DIR in backend/src/db/database.ts); /data/ covers a custom DATA_DIR.
+backend/data/
+/data/
 coverage/
 backend/node_modules/
 backend/dist/

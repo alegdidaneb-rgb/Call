@@ -13,6 +13,8 @@ interface CsvRow {
   city?: string;
   state?: string;
   zip?: string;
+  /** ISO 3166-1 alpha-2 code, e.g. "GB". Lowercase and full names are accepted. */
+  country?: string;
   source?: string;
   status?: string;
   [key: string]: string | undefined;
@@ -25,7 +27,7 @@ interface CsvImportProps {
 
 const csvColumns = [
   "first_name", "last_name", "company", "phone", "email",
-  "website", "address", "city", "state", "zip", "source", "status",
+  "website", "address", "city", "state", "zip", "country", "source", "status",
 ];
 
 export function CsvImport({ onClose, onImport }: CsvImportProps) {

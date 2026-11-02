@@ -9,6 +9,7 @@ import { CallScriptViewer } from "@/components/scripts/CallScriptViewer";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { ArrowLeft, Edit3, Trash2, Phone, Clock, Mail, Globe, MapPin, FileText, Calendar } from "lucide-react";
+import { countryName, flagEmoji } from "@/data/countries";
 
 export function LeadDetailPage() {
   const { leadId } = useParams<{ leadId: string }>();
@@ -73,7 +74,10 @@ export function LeadDetailPage() {
             <StatusBadge status={lead.status} />
           </div>
           <p className="text-sm text-gray-500 mt-1">
-            {lead.company ?? "No company"} · {lead.city ?? ""} {lead.state ?? ""} {lead.zip ?? ""}
+            {lead.company ?? "No company"}
+            {" · "}
+            {[lead.city, lead.state, lead.zip].filter(Boolean).join(" ") || "—"}
+            {lead.country ? ` · ${flagEmoji(lead.country)} ${countryName(lead.country)}` : ""}
           </p>
         </div>
         <div className="flex gap-2">
@@ -138,6 +142,12 @@ export function LeadDetailPage() {
                 ["Website", lead.website ?? "—"],
                 ["Address", lead.address ?? "—"],
                 ["City", [lead.city, lead.state, lead.zip].filter(Boolean).join(", ") || "—"],
+                [
+                  "Country",
+                  lead.country
+                    ? `${flagEmoji(lead.country)} ${countryName(lead.country)}`.trim()
+                    : "—",
+                ],
                 ["Calls", String(lead.call_count ?? 0)],
                 ["Last Called", lead.last_called_at ? new Date(lead.last_called_at).toLocaleString() : "Never"],
                 ["Created", new Date(lead.created_at).toLocaleDateString()],

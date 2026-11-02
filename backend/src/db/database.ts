@@ -53,6 +53,7 @@ db.exec(`
     city TEXT,
     state TEXT,
     zip TEXT,
+    country TEXT,
     status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'contacted', 'interested', 'not_interested', 'callback', 'converted', 'do_not_contact')),
     source TEXT,
     campaign_id TEXT REFERENCES campaigns(id) ON DELETE SET NULL,
@@ -171,6 +172,14 @@ function migrate(): void {
       "[db] Added missing profiles.invited_by column. Accounts are now provisioned " +
         "explicitly; unprovisioned agents have no data access."
     );
+  }
+
+  if (!columnExists("leads", "country")) {
+    db.exec("ALTER TABLE leads ADD COLUMN country TEXT");
+    db.exec("CREATE INDEX IF NOT EXISTS idx_leads_country ON leads(country)");
+    // Existing rows stay NULL on purpose: dialling codes are shared ("+1"
+    // covers 26 countries), so inferring a country from a stored phone number
+    // would write guesses into a compliance field.
   }
 
   if (!columnExists("leads", "created_by")) {
