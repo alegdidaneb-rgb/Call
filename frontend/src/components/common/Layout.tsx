@@ -17,7 +17,11 @@ import {
   Bell,
   Search,
   UserPlus,
+  PhoneCall,
 } from "lucide-react";
+import { useSipBootstrap } from "@/hooks/useSip";
+import { CallBar } from "@/components/softphone/CallBar";
+import { IncomingCallModal } from "@/components/softphone/IncomingCallModal";
 
 interface NavItem {
   to: string;
@@ -33,6 +37,7 @@ const navItems: NavItem[] = [
   { to: "/campaigns", label: "Campaigns", icon: Target },
   { to: "/scripts", label: "Scripts", icon: FileText },
   { to: "/history", label: "Call History", icon: Clock },
+  { to: "/phone", label: "Phone", icon: PhoneCall, roles: ["admin"] },
   { to: "/team", label: "Team", icon: UserPlus, roles: ["admin"] },
   { to: "/admin", label: "Admin", icon: Shield, roles: ["admin"] },
 ];
@@ -40,6 +45,9 @@ const navItems: NavItem[] = [
 export function Layout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user } = useAuth();
+  // Register the softphone once, here at the shell, so an agent stays reachable
+  // while moving between leads and an inbound call rings on any page.
+  useSipBootstrap();
   const visibleNavItems = navItems.filter((item) => !item.roles || item.roles.includes(user?.role ?? "agent"));
   const navigate = useNavigate();
 
@@ -143,6 +151,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+      <CallBar />
+      <IncomingCallModal />
     </div>
   );
 }

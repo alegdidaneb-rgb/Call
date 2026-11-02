@@ -46,6 +46,8 @@ A free, open-source browser-based cold calling dialer with SIP support. No insta
 - **Multi-Provider SIP** — Works with SignalWire, Telnyx, Twilio, or any SIP server
 - **Lead Management** — CRUD, CSV import, search, filter by status, international
   addresses (250 countries, dialling codes derived from the country)
+- **Web Softphone** — real SIP/WebRTC calling in the browser: registration, mute,
+  hold, DTMF, inbound calls, and call disposition written back to the lead
 - **Campaign Management** — Create and track outbound calling campaigns
 - **Call Scripts** — Script templates with objection handling responses
 - **Call History** — Log every call with outcome, duration, and notes
@@ -141,16 +143,31 @@ a compliance problem, not a cosmetic one.
 
 ## SIP Configuration
 
-To make real phone calls, configure your SIP provider in `.env.local`:
+Calls are placed from the browser over WebRTC, through a SIP provider that
+connects them to the telephone network. A browser cannot reach a phone number on
+its own, so **without provider credentials there is nothing to call with** — and
+the app says so on every lead page instead of pretending to dial.
 
-```env
-VITE_SIP_URI=sip:your-extension@your-domain.sip.signalwire.com
-VITE_SIP_PASSWORD=your-password
-VITE_SIP_WS_URL=wss://your-domain.sip.signalwire.com
-VITE_SIP_CALLER_ID=+1XXXXXXXXXX
-```
+Sign in as an administrator and open **Phone** in the sidebar to add credentials.
+They take effect immediately, on every open session, with no rebuild:
 
-Works with SignalWire, Telnyx, Twilio, Asterisk, FreeSWITCH, or any SIP server.
+| Field | Example |
+| --- | --- |
+| SIP URI | `sip:1001@pbx.example.com` |
+| WebSocket URL | `wss://pbx.example.com:8089/ws` |
+| Password | the extension's digest password |
+| Assign to | shared trunk default, or one specific agent |
+
+**Test connection** registers and then unregisters without placing a call, and
+waits for the server to *confirm* the registration — so a wrong password is
+caught before a campaign starts rather than in the middle of one.
+
+Build-time `VITE_SIP_*` variables remain supported as a fallback (see
+`.env.example`), but they are compiled into the bundle, so changing one needs a
+redeploy.
+
+Works with SignalWire, Telnyx, Twilio, Asterisk, FreeSWITCH, 3CX, or any SIP
+server that accepts WebSocket clients.
 
 See [SIP Providers Guide](docs/sip-providers.md)
 

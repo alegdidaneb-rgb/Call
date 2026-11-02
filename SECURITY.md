@@ -62,13 +62,36 @@ Never ship the `service_role` or `sb_secret_*` key to the browser. Only
 
 ### SIP credentials
 
-`VITE_SIP_*` values are compiled into the browser bundle and are therefore
-visible to anyone using the app. Treat them as per-agent, low-trust credentials:
+A browser softphone performs SIP digest authentication itself, so the password
+must reach the page. This is inherent to calling from a browser rather than a
+server-side trunk, and no client-side design removes it. Treat these as
+per-agent, low-trust credentials.
 
-- issue one SIP extension per agent rather than sharing one;
-- restrict the provider account so an extension can only dial permitted
-  destinations;
-- rotate credentials if they may have leaked.
+Credentials live in `public.sip_accounts`, readable only by the owning agent and
+by administrators (`is_admin()`), and writable only by administrators. An agent
+cannot edit their own row, because that would let them point the softphone at a
+server they control. Unprovisioned accounts can read nothing, including the
+shared trunk default. `anon` has no grants at all. A partial unique index allows
+at most one trunk default, so the "which extension am I dialling from?" lookup
+cannot become ambiguous.
+
+In self-hosted API mode the same rules are enforced by `requireRole("admin")` on
+every write and by `requireProvisioned` on every read.
+
+`VITE_SIP_*` values, if used, are compiled into the browser bundle and visible to
+anyone who can load the app. Whichever path is used:
+
+- issue one SIP extension per agent rather than sharing one, so a leak can be
+  contained and a provider-side block applied without ending a campaign;
+- restrict each extension at the provider: cap concurrent calls, limit permitted
+  destinations, and block premium-rate ranges;
+- rotate credentials if they may have leaked, and remember that a browser
+  extension or a shared workstation can read them at any time.
+
+Cold calling carries legal exposure — consent, time-of-day and do-not-call rules
+— that no amount of client-side validation reduces. The `dnc_list` table and the
+per-lead country are the app's contribution; the operator's obligations are not
+discharged by them.
 
 ## Environment Variables
 

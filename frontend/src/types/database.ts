@@ -263,6 +263,49 @@ export type Database = {
           updated_at?: string;
         };
       };
+      sip_accounts: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          label: string | null;
+          provider: "signalwire" | "telnyx" | "twilio" | "custom";
+          sip_uri: string;
+          password: string;
+          ws_url: string;
+          caller_id: string | null;
+          stun_urls: string[];
+          register_expiry: number;
+          enabled: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          label?: string | null;
+          provider?: "signalwire" | "telnyx" | "twilio" | "custom";
+          sip_uri: string;
+          password: string;
+          ws_url: string;
+          caller_id?: string | null;
+          stun_urls?: string[];
+          register_expiry?: number;
+          enabled?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          label?: string | null;
+          provider?: "signalwire" | "telnyx" | "twilio" | "custom";
+          sip_uri?: string;
+          password?: string;
+          ws_url?: string;
+          caller_id?: string | null;
+          stun_urls?: string[];
+          register_expiry?: number;
+          enabled?: boolean;
+        };
+      };
       dnc_list: {
         Row: {
           id: string;

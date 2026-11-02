@@ -101,6 +101,18 @@ export const api = {
       request<void>(`/api/call-logs/${id}`, { method: "DELETE" }),
   },
 
+  sipAccounts: {
+    /** The credentials this agent should register with, or null if none exist. */
+    effective: () => request<any | null>("/api/sip-accounts/effective"),
+    list: () => request<any[]>("/api/sip-accounts"),
+    create: (data: any) =>
+      request<any>("/api/sip-accounts", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: string, data: any) =>
+      request<any>(`/api/sip-accounts/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    delete: (id: string) =>
+      request<void>(`/api/sip-accounts/${id}`, { method: "DELETE" }),
+  },
+
   scripts: {
     list: () => request<any[]>("/api/scripts"),
     get: (id: string) => request<any>(`/api/scripts/${id}`),

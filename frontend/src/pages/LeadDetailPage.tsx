@@ -4,11 +4,18 @@ import { useLead } from "@/hooks/useLeads";
 import { useCallLog } from "@/hooks/useCallLogs";
 import { useCreateCallLog } from "@/hooks/useCallLogs";
 import { useUpdateLead, useDeleteLead } from "@/hooks/useLeads";
+import toast from "react-hot-toast";
 import { Softphone } from "@/components/softphone/Softphone";
+import type { CallEndData } from "@/components/softphone/types";
+import type { Database } from "@/types/database";
+
+/** Narrowed to the values the database actually accepts, rather than `any`. */
+type CallLogOutcome = Database["public"]["Tables"]["call_logs"]["Row"]["outcome"];
+import { LeadForm } from "@/components/leads/LeadForm";
 import { CallScriptViewer } from "@/components/scripts/CallScriptViewer";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
-import { ArrowLeft, Edit3, Trash2, Phone, Clock, Mail, Globe, MapPin, FileText, Calendar } from "lucide-react";
+import { ArrowLeft, Edit3, Trash2, Phone, Mail, Globe, MapPin, FileText } from "lucide-react";
 import { countryName, flagEmoji } from "@/data/countries";
 
 export function LeadDetailPage() {
@@ -24,21 +31,45 @@ export function LeadDetailPage() {
   const [showEdit, setShowEdit] = useState(false);
   const [showScript, setShowScript] = useState(false);
 
-  function handleCallEnd(data: { outcome: string; duration: number; notes: string; direction: "outbound" | "inbound" }) {
-    createCallLog.mutateAsync({
-      lead_id: leadId ?? null,
-      user_id: null,
-      campaign_id: null,
-      direction: data.direction,
-      outcome: data.outcome as any,
-      duration_seconds: data.duration,
-      recording_url: null,
-      transcript: null,
-      sip_call_id: null,
-      started_at: null,
-      ended_at: null,
-      notes: data.notes,
-    });
+  /**
+   * Persist the disposition, then reflect it on the lead.
+   *
+   * `call_count` and `last_called_at` are rendered on this page but nothing ever
+   * wrote to them, so every lead read "0 calls / Never" however many times it was
+   * dialled. The SIP Call-ID is stored too: it is the only field that ties a
+   * logged call back to the provider's own record.
+   */
+  async function handleCallEnd(data: CallEndData) {
+    try {
+      await createCallLog.mutateAsync({
+        lead_id: leadId ?? null,
+        user_id: null,
+        campaign_id: null,
+        direction: data.direction,
+        outcome: data.outcome as CallLogOutcome,
+        duration_seconds: data.duration,
+        recording_url: null,
+        transcript: null,
+        sip_call_id: data.sipCallId,
+        started_at: data.startedAt,
+        ended_at: data.endedAt,
+        notes: data.notes || null,
+      });
+
+      if (lead) {
+        await updateLeadMutation.mutateAsync({
+          id: lead.id,
+          call_count: (lead.call_count ?? 0) + 1,
+          last_called_at: data.endedAt ?? new Date().toISOString(),
+          status: lead.status === "new" ? "contacted" : lead.status,
+        });
+      }
+      toast.success("Call saved");
+    } catch (error) {
+      // A disposition that fails to save must not look like a success, or the
+      // agent moves to the next lead believing the record exists.
+      toast.error(error instanceof Error ? error.message : "Could not save the call");
+    }
   }
 
   if (isLoading) {
@@ -198,6 +229,40 @@ export function LeadDetailPage() {
       {showScript && (
         <CallScriptViewer
           onClose={() => setShowScript(false)}
+        />
+      )}
+
+      {showEdit && (
+        <LeadForm
+          onClose={() => setShowEdit(false)}
+          initialData={{
+            first_name: lead.first_name ?? "",
+            last_name: lead.last_name ?? "",
+            company: lead.company ?? "",
+            country: lead.country ?? "",
+            phone: lead.phone ?? "",
+            email: lead.email ?? "",
+            website: lead.website ?? "",
+            address: lead.address ?? "",
+            city: lead.city ?? "",
+            state: lead.state ?? "",
+            zip: lead.zip ?? "",
+            source: lead.source ?? "",
+            status: lead.status,
+            campaign_id: lead.campaign_id ?? "",
+          }}
+          onSubmit={async (data) => {
+            try {
+              await updateLeadMutation.mutateAsync({
+                id: lead.id,
+                ...(data as Database["public"]["Tables"]["leads"]["Update"]),
+              });
+              setShowEdit(false);
+              toast.success("Lead updated");
+            } catch (error) {
+              toast.error(error instanceof Error ? error.message : "Could not save the lead");
+            }
+          }}
         />
       )}
     </div>

@@ -16,6 +16,9 @@ const CallHistoryPage = React.lazy(() => import("@/pages/CallHistoryPage").then(
 const ScriptsPage = React.lazy(() => import("@/pages/ScriptsPage").then((m) => ({ default: m.ScriptsPage })));
 const AdminPage = React.lazy(() => import("@/pages/AdminPage").then((m) => ({ default: m.AdminPage })));
 const TeamPage = React.lazy(() => import("@/pages/TeamPage").then((m) => ({ default: m.TeamPage })));
+const PhoneSettingsPage = React.lazy(() =>
+  import("@/pages/PhoneSettingsPage").then((m) => ({ default: m.PhoneSettingsPage })),
+);
 
 function PageSpinner() {
   return (
@@ -120,6 +123,14 @@ function AppRoutes() {
                     element={
                       <RequireRole roles={["admin"]}>
                         <AdminPage />
+                      </RequireRole>
+                    }
+                  />
+                  <Route
+                    path="phone"
+                    element={
+                      <RequireRole roles={["admin"]}>
+                        <PhoneSettingsPage />
                       </RequireRole>
                     }
                   />

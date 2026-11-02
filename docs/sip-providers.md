@@ -1,77 +1,107 @@
 # SIP Provider Setup
 
-Cold Dialer works with any SIP provider. Here's how to configure popular providers.
+A browser cannot reach the telephone network on its own. It registers with a SIP
+provider over a secure WebSocket (`wss://`) and exchanges audio with it over
+WebRTC; the provider is what actually places the call. **Without provider
+credentials there is nothing to call with** — the app says so plainly on every
+lead page and offers an *Open in phone app* link instead of pretending to dial.
 
-## SignalWire
+## Where to enter credentials
 
-1. Create account at [signalwire.com](https://signalwire.com)
-2. Create a SIP endpoint in your project
-3. Note your SIP credentials
+Sign in as an administrator and open **Phone** in the sidebar. Credentials saved
+there take effect immediately, on every open session — no rebuild and no
+redeploy.
 
-```env
-VITE_SIP_URI=sip:your-extension@your-project.sip.signalwire.com
-VITE_SIP_PASSWORD=your-password
-VITE_SIP_WS_URL=wss://your-project.sip.signalwire.com
-VITE_SIP_CALLER_ID=+1XXXXXXXXXX
-```
+| Field | What to enter |
+| --- | --- |
+| Provider | Picks sensible defaults for the WebSocket URL and STUN servers |
+| SIP URI | Your address of record, e.g. `sip:1001@pbx.example.com` |
+| Password | The digest password for that extension |
+| WebSocket URL | Must start with `wss://` — a page served over HTTPS cannot open an insecure `ws://` socket |
+| Outbound caller ID | Optional; the number the lead sees |
+| Assign to | *Shared trunk default* (everyone), or one specific agent |
 
-**Notes:**
-- Free tier includes $4 credit
-- Toll-free numbers require verification
-- Local numbers work immediately
+Press **Test connection** before saving. It registers and then unregisters, and
+places no call. It waits for the server to *confirm* registration, so a wrong
+password fails here rather than later, mid-campaign.
 
-## Telnyx
+Build-time `VITE_SIP_*` variables still work and are used when no database
+account exists — see `.env.example`. They are compiled into the bundle, so
+changing one requires a redeploy; the Phone page is the better path.
 
-1. Create account at [telnyx.com](https://telnyx.com)
-2. Create a SIP connection in Mission Control
-3. Buy a phone number
+## Per-agent extensions
 
-```env
-VITE_SIP_URI=sip:username@sip.telnyx.com
-VITE_SIP_PASSWORD=your-password
-VITE_SIP_WS_URL=wss://sip.telnyx.com:8443
-VITE_SIP_CALLER_ID=+1XXXXXXXXXX
-```
+Give each agent their own extension wherever your provider allows it. A browser
+softphone must hold the password in the page to answer the SIP digest challenge,
+so any credential in this app is readable by whoever can sign in. Per-agent
+extensions mean one leaked password cannot be used to dial on the whole trunk,
+and a provider-side block can be applied to one extension instead of shutting
+down a campaign.
 
-**Notes:**
-- Free trial includes $10 credit
-- Requires paid plan to buy numbers
-- Excellent call quality
+Restrict each extension at the provider as well: cap concurrent calls, limit
+permitted destinations, and block premium-rate ranges. Cold calling has legal
+exposure that no client-side code can reduce.
 
-## Twilio
+## Providers
 
-1. Create account at [twilio.com](https://twilio.com)
-2. Create a SIP domain in Console
-3. Buy a phone number
+Exact endpoints change; treat the values below as a starting point and confirm
+them in your provider's console, then verify with **Test connection**.
 
-```env
-VITE_SIP_URI=sip:your-sip-domain.pstn.twilio.com
-VITE_SIP_PASSWORD=your-password
-VITE_SIP_WS_URL=wss://your-sip-domain.pstn.twilio.com
-VITE_SIP_CALLER_ID=+1XXXXXXXXXX
-```
+### SignalWire
 
-## Custom SIP Server
+Create a SIP endpoint in your Space and use its credentials.
 
-For Asterisk, FreeSWITCH, or other SIP servers:
+- SIP URI: `sip:<extension>@<your-space>.sip.signalwire.com`
+- WebSocket URL: `wss://<your-space>.sip.signalwire.com:5066`
 
-```env
-VITE_SIP_URI=sip:username@your-server.com
-VITE_SIP_PASSWORD=your-password
-VITE_SIP_WS_URL=wss://your-server.com:8089
-VITE_SIP_CALLER_ID=+1XXXXXXXXXX
-```
+### Telnyx
 
-## Testing Without a Provider
+Registration from a browser needs a **SIP Credential Connection** in Mission
+Control, not an IP-based one. An IP connection authenticates by source address,
+which a browser cannot offer.
 
-If SIP is not configured, the app uses simulated calls:
+- SIP URI: `sip:<connection-user>@sip.telnyx.com`
+- WebSocket URL: `wss://sip.telnyx.com`
 
-1. Leave SIP env vars empty
-2. Click "Call" on any lead
-3. The app simulates connecting, ringing, and active states
+### Twilio
 
-## Audio Requirements
+Use a **SIP Domain** with credential-based registration (a Credential List or
+Auth Username/Password), not an ACL-only trunk. Note that Twilio Voice JS is a
+separate product with its own access-token authentication; this app speaks
+standard SIP and does not use it.
 
-- Microphone access is required for calls
-- Use headphones to prevent echo
-- Test your audio in browser settings
+- SIP URI: `sip:<username>@<your-domain>.sip.twilio.com`
+- WebSocket URL: `wss://<your-domain>.sip.twilio.com`
+
+### Asterisk, FreeSWITCH, 3CX and other PBXs
+
+Enable the WebSocket transport and a WSS listener, then create an extension with
+`webrtc=yes` (Asterisk) or the equivalent.
+
+- SIP URI: `sip:<extension>@<pbx-host>`
+- WebSocket URL: `wss://<pbx-host>:8089/ws` (Asterisk's default `ws` path)
+
+A self-signed certificate will fail silently in the browser. Serve the PBX's
+WebSocket endpoint from a certificate the browser already trusts.
+
+## When a call does not work
+
+The softphone reports a specific reason rather than a generic failure. What each
+one usually means:
+
+| Message | Likely cause | Fix |
+| --- | --- | --- |
+| Could not reach the SIP server | Wrong `wss://` URL, or the server does not accept browser clients | Check the URL and port; confirm the provider supports SIP over WebSocket |
+| The server did not confirm registration | Wrong SIP URI or password, or the extension is not WebRTC-enabled | Re-check both; on Telnyx, confirm it is a Credential Connection |
+| Microphone access was blocked | Browser permission denied | Allow the microphone for the site, then dial again |
+| Calls need a secure origin | App served over plain HTTP | WebRTC and the microphone require HTTPS (or localhost) |
+| Connected, but one-way or no audio | No STUN/ICE servers, or a firewall blocking RTP | Keep the default STUN servers; open the provider's RTP media range |
+| Audio playback was blocked | Browser autoplay policy | Click anywhere on the page once; the dial click normally satisfies this |
+
+## Audio requirements
+
+- A microphone is required, and headphones are strongly recommended: without
+  them the far end hears its own voice echoed back.
+- Only one call at a time. A second inbound call is rejected automatically.
+- Duration counts talk time from the moment the call is answered, so ring time is
+  not recorded as a conversation.

@@ -120,6 +120,23 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS sip_accounts (
+    id TEXT PRIMARY KEY,
+    user_id TEXT REFERENCES profiles(id) ON DELETE CASCADE,
+    label TEXT,
+    provider TEXT NOT NULL DEFAULT 'custom'
+      CHECK (provider IN ('signalwire', 'telnyx', 'twilio', 'custom')),
+    sip_uri TEXT NOT NULL,
+    password TEXT NOT NULL,
+    ws_url TEXT NOT NULL,
+    caller_id TEXT,
+    stun_urls TEXT NOT NULL DEFAULT '["stun:stun.l.google.com:19302"]',
+    register_expiry INTEGER NOT NULL DEFAULT 600 CHECK (register_expiry BETWEEN 60 AND 3600),
+    enabled INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status);
   CREATE INDEX IF NOT EXISTS idx_leads_phone ON leads(phone);
   CREATE INDEX IF NOT EXISTS idx_leads_campaign ON leads(campaign_id);
@@ -130,6 +147,11 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_appointments_lead ON appointments(lead_id);
   CREATE INDEX IF NOT EXISTS idx_appointments_user ON appointments(user_id);
   CREATE INDEX IF NOT EXISTS idx_dnc_phone ON dnc_list(phone);
+  -- One account per owner, and only one shared trunk default (user_id NULL).
+  -- SQLite treats NULLs as distinct in a plain unique index, so the sentinel
+  -- value is what makes "at most one trunk default" enforceable.
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_sip_accounts_owner
+    ON sip_accounts(COALESCE(user_id, '__trunk_default__'));
 `);
 
 /**
