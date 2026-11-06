@@ -200,6 +200,105 @@ address the browser cannot reach and the call will be silent in one or both
 directions. The app sends Google's public STUN servers by default, which covers
 the browser side.
 
+## Bitcall (outbound-only wholesale trunk)
+
+Bitcall is a **wholesale SIP termination trunk**, not a WebRTC provider, so a browser
+cannot talk to it directly. The endpoint it publishes is:
+
+| Setting | Value |
+| --- | --- |
+| SIP domain | `gateway.bitcall.io` |
+| Port | `5060` |
+| Transport | UDP by default. TCP and TLS work **via the domain only** — never via the raw IP |
+| Credentials | `panel.bitcall.io` → SIP Account (username, password, domain) |
+| Number format | E.164 with `+`, e.g. `+442071234567` |
+| Direction | **Outbound only** — no inbound DIDs yet |
+
+A browser can only carry SIP over WebSocket (RFC 7118). `gateway.bitcall.io:5060` is
+plain SIP over UDP, so something has to translate between the two. Two supported ways.
+
+### Option A — Bitcall's own WebRTC-to-SIP gateway (recommended)
+
+Bitcall publishes a self-hosted gateway that runs Kamailio in Docker and exposes SIP over
+WSS on port 443 with an automatically issued Let's Encrypt certificate:
+
+```bash
+# On a Linux VPS with a hostname pointing at it, e.g. sip.example.com -> A record
+sudo apt-get update && sudo apt-get install -y curl ca-certificates
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+sudo npm i -g @bitcall/webrtc-sip-gateway
+sudo bitcall-gateway init          # add --advanced for provider/origin allowlists
+sudo bitcall-gateway status
+```
+
+Behaviour, read from the package source (`@bitcall/webrtc-sip-gateway`; the GitHub repo
+`Bitcallio/webrtc-sip-gateway` is not public):
+
+- Needs Docker Engine from the official apt repos plus the `docker compose` plugin. The
+  snap `docker-compose` is unsupported because it cannot access `/opt/bitcall-gateway`.
+- The container runs with `network_mode: host` and serves WSS on `WSS_LISTEN_PORT`
+  (default **443**) at the **root path** — so the WebSocket URL is `wss://<domain>/`.
+- TLS is issued and renewed through Let's Encrypt via an ACME webroot
+  (`sudo bitcall-gateway cert status` / `cert renew`), so the certificate trap described
+  in the PBX section above does not apply to this gateway.
+- Configuration lives in `/opt/bitcall-gateway/.env`:
+  - `ROUTING_MODE` — `universal` (default, accepts any SIP domain) or `single-provider`.
+  - `SIP_PROVIDER_URI=sip:gateway.bitcall.io:5060;transport=udp` — required in
+    single-provider mode, which is the tighter and more predictable choice for Bitcall.
+  - `WEBPHONE_ORIGIN` — defaults to `*`. **Set it to your Cold Dialer origin**
+    (e.g. `https://cold-dialer-one.vercel.app`) so only your app can use the gateway.
+  - `SIP_TRUSTED_IPS` — defaults to empty, i.e. any source IP.
+  - `TURN_MODE=coturn` adds a coturn container for agents behind restrictive NAT.
+- Debugging: `sudo bitcall-gateway sip-trace` opens a live SIP capture (sngrep); the
+  image also ships `tcpdump`.
+
+Verify the gateway before touching Cold Dialer:
+
+```bash
+DOMAIN="$(grep '^DOMAIN=' /opt/bitcall-gateway/.env | cut -d= -f2)"
+curl -k -i -N -H "Connection: Upgrade" -H "Upgrade: websocket" \
+  -H "Sec-WebSocket-Version: 13" -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
+  -H "Sec-WebSocket-Protocol: sip" "https://${DOMAIN}/" | head -n 5
+# Expect: HTTP/1.1 101 Switching Protocols
+sudo ss -ltnup | grep -E ':(443|5060|5061)\b'
+```
+
+Then in Cold Dialer → **Phone**:
+
+| Field | Value |
+| --- | --- |
+| Provider | Other (Asterisk, FreeSWITCH, 3CX, ...) |
+| SIP URI | `sip:<bitcall-sip-username>@gateway.bitcall.io` |
+| Password | your Bitcall SIP password |
+| WebSocket URL | `wss://<your-gateway-domain>/` |
+| Caller ID | the caller ID assigned to your Bitcall account |
+
+Click **Test connection**. `Registered` means the browser reached the gateway over WSS
+*and* Bitcall answered the REGISTER with 200 OK. If it reports *Could not register*, the
+gateway is reachable but Bitcall rejected the credentials — run `bitcall-gateway
+sip-trace` and read the 401/403 exchange.
+
+### Option B — bridge through a PBX you already run
+
+Follow the PBX section above, but instead of calling the PBX's own extensions, add
+Bitcall as an outbound trunk. For Asterisk that is a PJSIP endpoint / identify / aor
+triple pointed at `gateway.bitcall.io:5060` with `allow=ulaw`, plus `webrtc=yes` on the
+extension the browser registers to. Bitcall's own PBX guides use the same values:
+registrar `gateway.bitcall.io`, register/account-based authentication.
+
+### What will not work with Bitcall
+
+- **Inbound calls.** Bitcall does not offer inbound DIDs yet, so the incoming-call dialog
+  in Cold Dialer will never ring from the PSTN. Outbound dialling is unaffected.
+- **Registering the browser straight at Bitcall.** There is no documented
+  SIP-over-WebSocket listener on `gateway.bitcall.io` — only `5060/udp`. Never put
+  `gateway.bitcall.io` in the WebSocket URL field.
+- **Their hosted "Bit Dialer" widget.** Bitcall also sells an embeddable WebRTC webphone
+  (`BitcallWebphone.init({ key, sip: { ... } })`, from $29/month). That is a separate
+  product with its own UI and API key, not a SIP endpoint Cold Dialer can register to, so
+  adopting it means replacing this softphone rather than connecting it.
+
 ## When a call does not work
 
 The softphone reports a specific reason rather than a generic failure. What each

@@ -43,7 +43,7 @@ A free, open-source browser-based cold calling dialer with SIP support. No insta
 ## Features
 
 - **Browser Softphone** — SIP.js integration, no desktop app needed
-- **Multi-Provider SIP** — Works with SignalWire, Telnyx, Twilio, or any SIP server
+- **Multi-Provider SIP** — Works with SignalWire, Telnyx, Twilio, Bitcall, or any SIP server
 - **Lead Management** — CRUD, CSV import, search, filter by status, international
   addresses (250 countries, dialling codes derived from the country)
 - **Web Softphone** — real SIP/WebRTC calling in the browser: registration, mute,
@@ -166,8 +166,9 @@ Build-time `VITE_SIP_*` variables remain supported as a fallback (see
 `.env.example`), but they are compiled into the bundle, so changing one needs a
 redeploy.
 
-Works with SignalWire, Telnyx, Twilio, Asterisk, FreeSWITCH, 3CX, or any SIP
-server that accepts WebSocket clients.
+Works with SignalWire, Telnyx, Twilio, Asterisk, FreeSWITCH, 3CX, Bitcall
+(through its WebRTC-SIP gateway), or any SIP server that accepts WebSocket
+clients.
 
 See [SIP Providers Guide](docs/sip-providers.md)
 
