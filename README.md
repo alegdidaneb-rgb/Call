@@ -170,7 +170,9 @@ Works with SignalWire, Telnyx, Twilio, Asterisk, FreeSWITCH, 3CX, Bitcall
 (through its WebRTC-SIP gateway), or any SIP server that accepts WebSocket
 clients.
 
-See [SIP Providers Guide](docs/sip-providers.md)
+See the [SIP Providers Guide](docs/sip-providers.md) for which providers a browser can
+register to directly, and [Connecting to Bitcall](docs/bitcall-gateway.md) for the
+gateway runbook.
 
 ---
 

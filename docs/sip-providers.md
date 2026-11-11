@@ -259,6 +259,10 @@ plain SIP over UDP, so something has to translate between the two. Two supported
 
 ### Option A — Bitcall's own WebRTC-to-SIP gateway (recommended)
 
+**Full step-by-step runbook: [Connecting Cold Dialer to Bitcall](bitcall-gateway.md).** It
+covers getting a free VPS and hostname, the cloud-firewall ports, the exact answers to
+give the installer wizard, and a failure table. The summary follows.
+
 Bitcall publishes a self-hosted gateway that runs Kamailio in Docker and exposes SIP over
 WSS on port 443 with an automatically issued Let's Encrypt certificate:
 

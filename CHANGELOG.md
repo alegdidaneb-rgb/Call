@@ -41,6 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Express.js API server with JWT authentication
 - Provider abstraction layer (Supabase or self-hosted backend)
 - Docker Compose deployment
+- `docs/bitcall-gateway.md`, a runbook for reaching Bitcall through its own
+  `@bitcall/webrtc-sip-gateway`: free VPS and hostname options, the cloud-firewall
+  ports, the exact installer answers, verification, and a failure table
 - A Bitcall section in the SIP provider guide: the `gateway.bitcall.io:5060/udp`
   trunk, the self-hosted `@bitcall/webrtc-sip-gateway` WebRTC bridge, and the
   fact that Bitcall is outbound-only
