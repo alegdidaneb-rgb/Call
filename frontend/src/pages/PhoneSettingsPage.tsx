@@ -164,7 +164,16 @@ export function PhoneSettingsPage() {
     setForm((previous) => {
       if (!previous) return previous;
       const domain = domainFromSipUri(previous.sipUri);
-      const auto = domain ? deriveWsUrl(provider, domain) : SIP_PRESETS[provider].example.wsUrl;
+      const preset = SIP_PRESETS[provider];
+      // A provider with no SIP-over-WebSocket listener gets no guess at all. The
+      // address has to name a PBX or gateway the operator runs, which cannot be
+      // inferred from the provider, and a plausible-looking guess is worse than
+      // an empty field.
+      const auto = preset.browserReady
+        ? domain
+          ? deriveWsUrl(provider, domain)
+          : preset.example.wsUrl
+        : "";
       const derived =
         previous.wsUrl.trim() === "" ||
         SIP_PROVIDERS.some((candidate) => previous.wsUrl.trim() === deriveWsUrl(candidate, domain));
@@ -404,6 +413,22 @@ export function PhoneSettingsPage() {
                 </select>
               </Field>
 
+              {!SIP_PRESETS[form.provider].browserReady && (
+                <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+                  <p className="font-semibold">
+                    {SIP_PRESETS[form.provider].label} has no SIP-over-WebSocket endpoint
+                  </p>
+                  <p className="mt-1 leading-relaxed">
+                    {SIP_PRESETS[form.provider].browserNote}
+                  </p>
+                  <p className="mt-1 leading-relaxed">
+                    The WebSocket URL below must name a server that answers SIP over
+                    WebSocket &mdash; your PBX, or a WebRTC-to-SIP gateway you run. The
+                    provider&apos;s own SIP domain belongs in the SIP URI field, not there.
+                  </p>
+                </div>
+              )}
+
               <Field
                 label="SIP URI (address of record)"
                 hint={SIP_PRESETS[form.provider].example.sipUri}
@@ -429,7 +454,13 @@ export function PhoneSettingsPage() {
 
               <Field
                 label="WebSocket URL"
-                hint={SIP_PRESETS[form.provider].example.wsUrl}
+                hint={
+                  form.provider === "custom"
+                    ? "The PBX or WebRTC gateway the browser talks to, e.g. wss://pbx.example.com:8089/ws. A trunk such as Bitcall (gateway.bitcall.io on 5060/udp) belongs in the SIP URI field above, never here."
+                    : SIP_PRESETS[form.provider].browserReady
+                      ? `Where the browser connects, e.g. ${SIP_PRESETS[form.provider].example.wsUrl}`
+                      : `A PBX or gateway you run, e.g. ${SIP_PRESETS[form.provider].example.wsUrl} — not the provider's SIP domain`
+                }
               >
                 <input
                   value={form.wsUrl}

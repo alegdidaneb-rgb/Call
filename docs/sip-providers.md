@@ -44,34 +44,74 @@ exposure that no client-side code can reduce.
 
 ## Providers
 
+Only some providers answer SIP over WebSocket, and a browser can use nothing
+else. Check this first: it decides whether the softphone can point straight at
+the provider, or whether a PBX or gateway has to sit in between.
+
+| Provider | Browser can register directly | WebSocket URL |
+| --- | --- | --- |
+| Telnyx | **Yes** | `wss://sip.telnyx.com:7443` |
+| SignalWire | Not documented — see below | use a PBX or gateway |
+| Twilio | **No** | use a PBX or gateway |
+| Bitcall | **No** | use a gateway — see the Bitcall section |
+| Asterisk, FreeSWITCH, 3CX | Yes, once configured | your own `wss://` endpoint |
+
 Exact endpoints change; treat the values below as a starting point and confirm
-them in your provider's console, then verify with **Test connection**.
+them in your provider's console, then verify with **Test connection**. The Phone
+page deliberately does not guess a WebSocket URL for a provider that has no
+WebSocket listener, because a plausible-looking guess is worse than an empty
+field.
 
-### SignalWire
+### Telnyx — works from a browser
 
-Create a SIP endpoint in your Space and use its credentials.
-
-- SIP URI: `sip:<extension>@<your-space>.sip.signalwire.com`
-- WebSocket URL: `wss://<your-space>.sip.signalwire.com:5066`
-
-### Telnyx
-
-Registration from a browser needs a **SIP Credential Connection** in Mission
-Control, not an IP-based one. An IP connection authenticates by source address,
-which a browser cannot offer.
+The only major trunk in that table a browser can register to directly.
+Registration needs a **SIP Credential Connection** in Mission Control, not an
+IP-based one: an IP connection authenticates by source address, which a browser
+cannot offer.
 
 - SIP URI: `sip:<connection-user>@sip.telnyx.com`
-- WebSocket URL: `wss://sip.telnyx.com`
+- WebSocket URL: `wss://sip.telnyx.com:7443`
+- STUN: `stun:stun.telnyx.com:3843`
 
-### Twilio
+`7443` is the US region — the port Telnyx publishes on `sip.telnyx.com` and the
+one its own SIP.js wrapper (`@telnyx/rtc-sipjs`) uses. Other regions are listed
+in machine-readable form at `https://sip.telnyx.com/voice.json`. Note that 8443
+is filtered on some networks while 7443 connects.
 
-Use a **SIP Domain** with credential-based registration (a Credential List or
-Auth Username/Password), not an ACL-only trunk. Note that Twilio Voice JS is a
-separate product with its own access-token authentication; this app speaks
-standard SIP and does not use it.
+Agents behind symmetric NAT may also need TURN. Telnyx issues TURN credentials
+per user through its API; this app sends STUN only, so add TURN to the account's
+STUN/ICE field if calls connect but carry no audio.
 
-- SIP URI: `sip:<username>@<your-domain>.sip.twilio.com`
-- WebSocket URL: `wss://<your-domain>.sip.twilio.com`
+### SignalWire — SIP over WebSocket is not in its documentation
+
+A SignalWire SIP Credential gives you
+`sip:<username>@<your-space>.sip.signalwire.com` with a password, and the
+softphone table in SignalWire's own documentation lists the supported signalling
+transports as **TLS, TCP or UDP**. WebSocket is not among them, and its
+FreeSWITCH guide redirects browser calling to the proprietary **SignalWire
+Browser SDK** instead of SIP over WSS.
+
+One SignalWire marketing page does describe pointing JsSIP at
+`wss://<your-space>.sip.signalwire.com`, so it may well work — but it is not a
+documented, supported transport. Confirm with SignalWire before building on it.
+The reliable route is to register against a PBX or gateway you run and give that
+PBX the SignalWire trunk.
+
+The app leaves the WebSocket URL blank for SignalWire rather than inventing a
+port.
+
+### Twilio — no SIP over WebSocket
+
+Twilio SIP Domains accept registration over **UDP, TCP and TLS only**. There is
+no WebSocket listener, which is why no working `wss://` URL for Twilio exists to
+be found. Browser calling on Twilio is the **Voice JS SDK** — a separate product
+with its own access-token authentication that does not speak SIP, so this app
+cannot use it.
+
+To use this softphone with Twilio, register it against a PBX or gateway you run
+and give that PBX the Twilio trunk. The app leaves the WebSocket URL blank for
+Twilio instead of suggesting `wss://<your-domain>.sip.twilio.com`, which cannot
+connect.
 
 ### Your own PBX: Asterisk, FreeSWITCH, 3CX
 
@@ -268,7 +308,7 @@ Then in Cold Dialer → **Phone**:
 
 | Field | Value |
 | --- | --- |
-| Provider | Other (Asterisk, FreeSWITCH, 3CX, ...) |
+| Provider | Other (Asterisk, FreeSWITCH, 3CX, Bitcall gateway, ...) |
 | SIP URI | `sip:<bitcall-sip-username>@gateway.bitcall.io` |
 | Password | your Bitcall SIP password |
 | WebSocket URL | `wss://<your-gateway-domain>/` |

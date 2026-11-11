@@ -10,6 +10,18 @@ export interface SipPreset {
   registrationInterval: number;
   stunServers: string[];
   example: { sipUri: string; wsUrl: string };
+  /**
+   * Whether the provider itself answers SIP over WebSocket, so a browser can
+   * register to it directly.
+   *
+   * When this is false the provider only speaks SIP on 5060/udp or 5061/tls,
+   * which a browser cannot send: the WebSocket URL must then point at a PBX or
+   * a WebRTC-to-SIP gateway that the operator runs, and the provider's own SIP
+   * domain belongs only in the SIP URI field.
+   */
+  browserReady: boolean;
+  /** Explains, in the form, what to enter when `browserReady` is false. */
+  browserNote?: string;
 }
 
 /** STUN servers that work for every provider; used unless the account overrides them. */
@@ -24,36 +36,50 @@ export const SIP_PRESETS: Record<SipProvider, SipPreset> = {
     wsPort: 5066,
     registrationInterval: 600,
     stunServers: ["stun:stun.signalwire.com", ...DEFAULT_STUN_SERVERS],
+    browserReady: false,
+    browserNote:
+      "SignalWire's SIP Credential documentation lists TLS, TCP and UDP as the supported transports, and points browser calling at SignalWire's own Browser SDK rather than at SIP over WebSocket. Register this softphone against a PBX or gateway you run, or confirm SIP-over-WebSocket support with SignalWire before relying on it.",
     example: {
-      sipUri: "sip:1001@your-space.sip.signalwire.com",
-      wsUrl: "wss://your-space.sip.signalwire.com:5066",
+      sipUri: "sip:1001@pbx.example.com",
+      wsUrl: "wss://pbx.example.com:8089/ws",
     },
   },
   telnyx: {
     label: "Telnyx",
-    wsPort: 443,
+    // Verified against sip.telnyx.com: the US region serves SIP over WebSocket on
+    // 7443, and Telnyx's own SIP.js wrapper (@telnyx/rtc-sipjs) uses the same
+    // host and port. Other regions are listed at https://sip.telnyx.com/voice.json.
+    wsPort: 7443,
     registrationInterval: 600,
-    stunServers: ["stun:stun.telnyx.com", ...DEFAULT_STUN_SERVERS],
+    stunServers: ["stun:stun.telnyx.com:3843", ...DEFAULT_STUN_SERVERS],
+    browserReady: true,
     example: {
       sipUri: "sip:your-connection@sip.telnyx.com",
-      wsUrl: "wss://sip.telnyx.com",
+      wsUrl: "wss://sip.telnyx.com:7443",
     },
   },
   twilio: {
     label: "Twilio",
-    wsPort: 443,
-    registrationInterval: 600,
-    stunServers: DEFAULT_STUN_SERVERS,
-    example: {
-      sipUri: "sip:your-client@your-domain.sip.twilio.com",
-      wsUrl: "wss://your-domain.sip.twilio.com",
-    },
-  },
-  custom: {
-    label: "Other (Asterisk, FreeSWITCH, 3CX, ...)",
     wsPort: 8089,
     registrationInterval: 600,
     stunServers: DEFAULT_STUN_SERVERS,
+    browserReady: false,
+    browserNote:
+      "Twilio does not offer SIP over WebSocket. Its SIP Domains accept registration over UDP, TCP and TLS only, and browser calling on Twilio uses the proprietary Voice JS SDK instead of SIP.js. To use this softphone, register it against a PBX or gateway you run and give that PBX the Twilio trunk.",
+    example: {
+      sipUri: "sip:1001@pbx.example.com",
+      wsUrl: "wss://pbx.example.com:8089/ws",
+    },
+  },
+  custom: {
+    label: "Other (Asterisk, FreeSWITCH, 3CX, Bitcall gateway, ...)",
+    wsPort: 8089,
+    registrationInterval: 600,
+    stunServers: DEFAULT_STUN_SERVERS,
+    // True in the sense that whatever the operator names here is expected to
+    // answer SIP over WebSocket: their own PBX, or a provider-supplied gateway
+    // such as Bitcall's @bitcall/webrtc-sip-gateway.
+    browserReady: true,
     example: { sipUri: "sip:1001@pbx.example.com", wsUrl: "wss://pbx.example.com:8089/ws" },
   },
 };
@@ -120,6 +146,11 @@ export function domainFromSipUri(input: string): string {
 export function deriveWsUrl(provider: SipProvider, domain: string): string {
   if (!domain) return "";
   const preset = SIP_PRESETS[provider] ?? SIP_PRESETS.custom;
+  // Deriving a URL from a provider that has no SIP-over-WebSocket listener can
+  // only produce an address that cannot connect -- this is how a browser ends up
+  // pointed at a 5060/udp trunk. Leave the field empty so the operator has to
+  // name the PBX or gateway the browser should actually talk to.
+  if (!preset.browserReady) return "";
   const port = preset.wsPort === 443 ? "" : `:${preset.wsPort}`;
   return `wss://${domain}${port}`;
 }

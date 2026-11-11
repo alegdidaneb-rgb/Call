@@ -86,6 +86,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   have connected in silence
 - No STUN servers were configured — `SIP_PRESETS` defined them and nothing read
   them — so a browser behind NAT could not be reached
+- The provider presets advertised endpoints that cannot work. Telnyx serves SIP
+  over WebSocket on **7443**, not 443. Twilio has no WebSocket listener at all —
+  its SIP Domains take UDP, TCP and TLS only — and SignalWire documents
+  TLS/TCP/UDP for SIP Credentials while steering browser calling to its own
+  proprietary SDK. The Phone page now marks those two as not browser-ready,
+  leaves the WebSocket URL blank instead of deriving an unreachable one, and
+  says plainly that a PBX or gateway is required
 - Mute and hold were cosmetic: they changed React state without disabling the
   audio track or sending a re-INVITE
 - The DTMF keypad sent no tones, and was ignored entirely whenever a lead was
