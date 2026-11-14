@@ -18,10 +18,24 @@ const NOT_CONFIGURED_MESSAGE =
  * error means a misconfigured deployment shows a message rather than silently
  * rendering empty tables that look like a successful load.
  */
-function createUnconfiguredBuilder(): any {
+/**
+ * A value that answers any property read and any call by returning itself, and
+ * settles as a rejected result when awaited. Typing it this way rather than
+ * `any` keeps the promise-shaped reads (`data`, `error`, `count`) honest at the
+ * one place the stand-in is constructed.
+ */
+type Chainable = ((...args: never[]) => Chainable) & {
+  then: (onFulfilled: (value: unknown) => unknown) => unknown;
+  data: null;
+  error: { message: string };
+  count: number;
+  [key: string]: unknown;
+};
+
+function createUnconfiguredBuilder(): Chainable {
   const resolved = { data: null, error: { message: NOT_CONFIGURED_MESSAGE }, count: 0 };
 
-  const chain: any = new Proxy(function () {}, {
+  const chain = new Proxy(function () {}, {
     get(_target, prop) {
       if (prop === "then") return (onFulfilled: (v: unknown) => unknown) => onFulfilled(resolved);
       if (prop === "data") return resolved.data;
@@ -32,7 +46,7 @@ function createUnconfiguredBuilder(): any {
     apply() {
       return chain;
     },
-  });
+  }) as unknown as Chainable;
 
   return chain;
 }

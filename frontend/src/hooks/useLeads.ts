@@ -1,12 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { api } from "@/lib/apiClient";
+import { api, isApiMode, type ImportError } from "@/lib/apiClient";
 import type { Database } from "@/types/database";
 
 type Lead = Database["public"]["Tables"]["leads"]["Row"];
 
-const API_URL = import.meta.env.VITE_API_URL || "";
-const isApiMode = Boolean(API_URL);
 
 export function useLeads() {
   return useQuery<Lead[]>({
@@ -91,19 +89,50 @@ export function useUpdateLead() {
  * list — so the import gets slower as it goes and the grid re-renders throughout.
  * One statement with one invalidation is both faster and calmer to watch.
  */
+export type NewLead = Omit<Lead, "id" | "created_at" | "updated_at" | "call_count">;
+
+export interface BulkImportVariables {
+  rows: NewLead[];
+  /** Attributes every imported lead to one campaign, or leaves them unassigned. */
+  campaignId?: string | null;
+}
+
+export interface BulkImportResult {
+  imported: number;
+  /**
+   * Rows the store refused. Supabase rejects the whole statement or none of it,
+   * so this is only ever non-zero on the API path, which imports row by row and
+   * reports the ones that failed.
+   */
+  failed: number;
+  errors: ImportError[];
+}
+
 export function useCreateLeads() {
   const queryClient = useQueryClient();
-  return useMutation<Lead[], Error, Array<Omit<Lead, "id" | "created_at" | "updated_at" | "call_count">>>({
-    mutationFn: async (leads) => {
-      if (leads.length === 0) return [];
+  return useMutation<BulkImportResult, Error, BulkImportVariables>({
+    mutationFn: async ({ rows, campaignId = null }) => {
+      if (rows.length === 0) return { imported: 0, failed: 0, errors: [] };
+
       if (isApiMode) {
-        const created: Lead[] = [];
-        for (const lead of leads) created.push(await api.leads.create(lead));
-        return created;
+        // The backend has a bulk endpoint for exactly this; calling `create` in
+        // a loop was one round trip per row, which is what the comment above
+        // says not to do.
+        const result = await api.leads.import(rows, campaignId);
+        return { imported: result.imported, failed: result.failed, errors: result.errors };
       }
-      const { data, error } = await supabase.from("leads").insert(leads).select();
+
+      const stamped = campaignId
+        ? rows.map((row) => ({ ...row, campaign_id: campaignId }))
+        : rows;
+      const { data, error } = await supabase.from("leads").insert(stamped).select();
       if (error) throw error;
-      return (data ?? []) as Lead[];
+      const created = (data ?? []) as Lead[];
+      return {
+        imported: created.length,
+        failed: Math.max(rows.length - created.length, 0),
+        errors: [],
+      };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leads"] });

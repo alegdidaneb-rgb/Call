@@ -1,8 +1,11 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
-import { ShieldCheck, ArrowLeft, AlertCircle } from "lucide-react";
+import { AlertCircle, ArrowLeft, ShieldCheck, UserPlus } from "lucide-react";
+import { AuthScreen } from "@/components/auth/AuthScreen";
+import { PasswordField } from "@/components/auth/PasswordField";
 import { bootstrapFirstAdmin, fetchSetupStatus } from "@/lib/auth";
+import { passwordSchema } from "@/lib/passwordPolicy";
 
 /**
  * First-run setup.
@@ -15,24 +18,24 @@ import { bootstrapFirstAdmin, fetchSetupStatus } from "@/lib/auth";
 
 const setupSchema = z
   .object({
-    fullName: z.string().min(2, "Name must be at least 2 characters"),
+    fullName: z.string().trim().min(2, "Enter your full name"),
     email: z.string().trim().toLowerCase().email("Enter a valid email address"),
-    password: z
-      .string()
-      .min(10, "Password must be at least 10 characters")
-      .regex(/[a-zA-Z]/, "Password must contain a letter")
-      .regex(/[0-9]/, "Password must contain a number"),
+    password: passwordSchema,
     confirmPassword: z.string(),
   })
   .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords do not match",
+    message: "The two passwords do not match",
     path: ["confirmPassword"],
   });
 
-type FieldErrors = Partial<Record<"fullName" | "email" | "password" | "confirmPassword", string>>;
+type FieldName = "fullName" | "email" | "password" | "confirmPassword";
+type FieldErrors = Partial<Record<FieldName, string>>;
 
 export function SetupPage() {
   const navigate = useNavigate();
+  const nameId = useId();
+  const emailId = useId();
+
   const [checking, setChecking] = useState(true);
   const [needsSetup, setNeedsSetup] = useState(false);
   const [fullName, setFullName] = useState("");
@@ -45,9 +48,20 @@ export function SetupPage() {
 
   useEffect(() => {
     let active = true;
-    void fetchSetupStatus()
+    fetchSetupStatus()
       .then((status) => {
         if (active) setNeedsSetup(status.needsSetup);
+      })
+      .catch((err: unknown) => {
+        // Say so rather than showing a spinner forever or an empty form that
+        // would fail on submit for a reason nobody can see.
+        if (active) {
+          setFormError(
+            err instanceof Error
+              ? `Could not check whether this deployment needs setup: ${err.message}`
+              : "Could not check whether this deployment needs setup.",
+          );
+        }
       })
       .finally(() => {
         if (active) setChecking(false);
@@ -65,7 +79,7 @@ export function SetupPage() {
     if (!parsed.success) {
       const next: FieldErrors = {};
       for (const issue of parsed.error.issues) {
-        const key = issue.path[0] as keyof FieldErrors;
+        const key = issue.path[0] as FieldName;
         if (key && !next[key]) next[key] = issue.message;
       }
       setFieldErrors(next);
@@ -84,167 +98,157 @@ export function SetupPage() {
       // wait for -- go straight to the sign-in form.
       navigate("/login", { state: { created: true } });
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Unable to create the administrator account");
+      setFormError(
+        err instanceof Error ? err.message : "Unable to create the administrator account",
+      );
       setSubmitting(false);
     }
   }
 
-  const inputClass = (invalid?: string) =>
-    `w-full px-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-accent focus:border-accent outline-none transition ${
-      invalid ? "border-danger/30 bg-danger/12" : "border-line-strong"
-    }`;
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-accent/10 to-accent/16 px-4">
-      <div className="w-full max-w-md">
-        <div className="bg-panel rounded-2xl shadow-xl p-8">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-lg bg-accent flex items-center justify-center">
-              <ShieldCheck className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-ink">Set up Cold Dialer</h1>
-              <p className="text-sm text-muted">Create the first administrator</p>
-            </div>
-          </div>
-
-          {checking ? (
-            <div className="flex items-center justify-center py-10">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
-            </div>
-          ) : !needsSetup ? (
-            <div className="py-4">
-              <div className="flex items-start gap-3 rounded-lg bg-app border border-line p-4">
-                <AlertCircle className="w-5 h-5 text-muted shrink-0 mt-0.5" />
-                <div className="text-sm text-ink">
-                  <p className="font-medium text-ink">This deployment is already set up.</p>
-                  <p className="mt-1">
-                    Accounts are created by an administrator. Ask yours to add you, then sign in.
-                  </p>
-                </div>
-              </div>
-              <Link
-                to="/login"
-                className="mt-6 flex items-center justify-center gap-2 w-full py-2.5 rounded-lg border border-line-strong text-sm font-medium text-ink hover:bg-app transition"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Back to sign in
-              </Link>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="rounded-lg bg-warning/12 border border-warning/30 p-3 text-xs text-warning">
-                This screen is available only while the database has no accounts. The account you
-                create here becomes an administrator, and from then on every account must be created
-                by an administrator from the Team page.
-              </div>
-
-              {formError && (
-                <div className="flex items-start gap-2 rounded-lg bg-danger/12 border border-danger/30 p-3 text-sm text-danger">
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span>{formError}</span>
-                </div>
-              )}
-
-              <div>
-                <label htmlFor="fullName" className="block text-sm font-medium text-ink mb-1">
-                  Full name
-                </label>
-                <input
-                  id="fullName"
-                  type="text"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  autoComplete="name"
-                  className={inputClass(fieldErrors.fullName)}
-                />
-                {fieldErrors.fullName && (
-                  <p className="text-xs text-danger mt-1">{fieldErrors.fullName}</p>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-ink mb-1">
-                  Work email
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  autoComplete="email"
-                  className={inputClass(fieldErrors.email)}
-                />
-                {fieldErrors.email && (
-                  <p className="text-xs text-danger mt-1">{fieldErrors.email}</p>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-ink mb-1">
-                  Password
-                </label>
-                <input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="new-password"
-                  className={inputClass(fieldErrors.password)}
-                />
-                <p className="text-xs text-muted mt-1">
-                  At least 10 characters, including a letter and a number.
-                </p>
-                {fieldErrors.password && (
-                  <p className="text-xs text-danger mt-1">{fieldErrors.password}</p>
-                )}
-              </div>
-
-              <div>
-                <label
-                  htmlFor="confirmPassword"
-                  className="block text-sm font-medium text-ink mb-1"
-                >
-                  Confirm password
-                </label>
-                <input
-                  id="confirmPassword"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  autoComplete="new-password"
-                  className={inputClass(fieldErrors.confirmPassword)}
-                />
-                {fieldErrors.confirmPassword && (
-                  <p className="text-xs text-danger mt-1">{fieldErrors.confirmPassword}</p>
-                )}
-              </div>
-
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full py-2.5 rounded-lg bg-accent text-white text-sm font-semibold hover:bg-accent-strong disabled:opacity-60 transition flex items-center justify-center gap-2"
-              >
-                {submitting ? (
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <>
-                    <ShieldCheck className="w-5 h-5" />
-                    Create administrator
-                  </>
-                )}
-              </button>
-            </form>
-          )}
-        </div>
-
-        <p className="text-center text-sm text-muted mt-6">
+    <AuthScreen
+      tagline="First-run setup"
+      title="Create the first administrator"
+      description="This screen is available only while the database has no accounts. Every account after this one is created by an administrator from the Team page."
+      footer={
+        <p>
           Already have an account?{" "}
-          <Link to="/login" className="font-medium text-accent hover:text-accent">
+          <Link to="/login" className="font-semibold text-accent hover:text-accent-strong">
             Sign in
           </Link>
         </p>
-      </div>
-    </div>
+      }
+    >
+      {checking ? (
+        <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted">
+          <span
+            className="h-4 w-4 animate-spin rounded-full border-2 border-accent border-t-transparent"
+            aria-hidden="true"
+          />
+          Checking this deployment…
+        </div>
+      ) : !needsSetup ? (
+        <div className="space-y-4">
+          {formError ? (
+            <p
+              className="rounded-lg border border-danger/30 bg-danger/12 p-3 text-sm text-danger"
+              role="alert"
+            >
+              {formError}
+            </p>
+          ) : (
+            <div className="flex items-start gap-3 rounded-lg border border-line bg-app p-4">
+              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-success" />
+              <div className="text-sm">
+                <p className="font-semibold text-ink">This deployment is already set up.</p>
+                <p className="mt-1 leading-relaxed text-muted">
+                  Accounts are created by an administrator. Ask yours to add you from the Team page,
+                  then sign in with the password they set.
+                </p>
+              </div>
+            </div>
+          )}
+          <Link to="/login" className="btn btn-secondary w-full">
+            <ArrowLeft className="h-4 w-4" />
+            Back to sign in
+          </Link>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          {formError ? (
+            <div
+              className="flex items-start gap-2 rounded-lg border border-danger/30 bg-danger/12 p-3 text-sm text-danger"
+              role="alert"
+            >
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{formError}</span>
+            </div>
+          ) : null}
+
+          <div>
+            <label className="label" htmlFor={nameId}>
+              Full name
+            </label>
+            <input
+              id={nameId}
+              name="fullName"
+              type="text"
+              value={fullName}
+              onChange={(event) => setFullName(event.target.value)}
+              autoComplete="name"
+              placeholder="Alex Moreau"
+              autoFocus
+              aria-invalid={Boolean(fieldErrors.fullName)}
+              aria-describedby={fieldErrors.fullName ? `${nameId}-error` : undefined}
+              className={`input ${fieldErrors.fullName ? "!border-danger/50" : ""}`}
+            />
+            {fieldErrors.fullName ? (
+              <p id={`${nameId}-error`} className="mt-1 text-xs text-danger" role="alert">
+                {fieldErrors.fullName}
+              </p>
+            ) : null}
+          </div>
+
+          <div>
+            <label className="label" htmlFor={emailId}>
+              Work email
+            </label>
+            <input
+              id={emailId}
+              name="email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              autoComplete="email"
+              placeholder="you@company.com"
+              aria-invalid={Boolean(fieldErrors.email)}
+              aria-describedby={fieldErrors.email ? `${emailId}-error` : undefined}
+              className={`input ${fieldErrors.email ? "!border-danger/50" : ""}`}
+            />
+            {fieldErrors.email ? (
+              <p id={`${emailId}-error`} className="mt-1 text-xs text-danger" role="alert">
+                {fieldErrors.email}
+              </p>
+            ) : null}
+          </div>
+
+          <PasswordField
+            label="Password"
+            value={password}
+            onChange={setPassword}
+            autoComplete="new-password"
+            error={fieldErrors.password}
+            requirements
+            hint="You will share this with nobody; write it into your password manager."
+          />
+
+          <PasswordField
+            label="Confirm password"
+            value={confirmPassword}
+            onChange={setConfirmPassword}
+            autoComplete="new-password"
+            error={fieldErrors.confirmPassword}
+            placeholder="Repeat it exactly"
+          />
+
+          <button type="submit" disabled={submitting} className="btn btn-primary w-full !py-2.5">
+            {submitting ? (
+              <>
+                <span
+                  className="h-4 w-4 animate-spin rounded-full border-2 border-inverse border-t-transparent"
+                  aria-hidden="true"
+                />
+                Creating account…
+              </>
+            ) : (
+              <>
+                <UserPlus className="h-4 w-4" />
+                Create administrator
+              </>
+            )}
+          </button>
+        </form>
+      )}
+    </AuthScreen>
   );
 }

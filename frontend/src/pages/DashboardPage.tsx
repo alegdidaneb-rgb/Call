@@ -12,6 +12,7 @@ import {
   TrendingUp,
   Users,
 } from "lucide-react";
+import { PageHeader } from "@/components/common/PageHeader";
 import { BarChart, Donut, Sparkline } from "@/components/charts/Charts";
 import { EmptyState } from "@/components/common/EmptyState";
 import { Skeleton, SkeletonCards } from "@/components/common/Skeleton";
@@ -37,7 +38,7 @@ type CallLog = Database["public"]["Tables"]["call_logs"]["Row"];
 /**
  * How the operation is going, over a period the operator chooses.
  *
- * The page this replaces listed six totals with no time dimension: "Total Leads
+ * The page this replaces listed six totals with no time dimension: "Total leads
  * 1,204" says nothing actionable on its own, and the same number looks identical
  * whether the team made four hundred calls this week or none. Everything here is
  * scoped to a window, compared against the window before it, and shown as a shape
@@ -123,7 +124,7 @@ function StatTile({
     <div className="card animate-rise-in p-4">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-faint">
+          <p className="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wider text-faint">
             <Icon className="h-3.5 w-3.5" />
             {label}
           </p>
@@ -131,7 +132,7 @@ function StatTile({
         </div>
         {change && !flat ? (
           <span
-            className={`tabular flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11px] font-semibold ${
+            className={`tabular flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-2xs font-semibold ${
               positive ? chipClass("success") : chipClass("danger")
             }`}
             title="Against the previous period of the same length"
@@ -148,9 +149,9 @@ function StatTile({
         </div>
       ) : null}
 
-      {sublabel ? <p className="mt-1.5 text-[11px] leading-relaxed text-faint">{sublabel}</p> : null}
+      {sublabel ? <p className="mt-1.5 text-2xs leading-relaxed text-faint">{sublabel}</p> : null}
       {flat && change ? (
-        <p className="mt-1.5 text-[11px] leading-relaxed text-faint">No calls in the previous period</p>
+        <p className="mt-1.5 text-2xs leading-relaxed text-faint">No calls in the previous period</p>
       ) : null}
     </div>
   );
@@ -287,40 +288,43 @@ export function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-5">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-ink">Dashboard</h1>
-          <p className="mt-1 text-sm text-muted">
-            {analysis.calls > 0
-              ? `${analysis.calls} call${analysis.calls === 1 ? "" : "s"} in the last ${rangeDays} days · ${analysis.diallable} lead${analysis.diallable === 1 ? "" : "s"} left to work`
-              : `${analysis.diallable} lead${analysis.diallable === 1 ? "" : "s"} waiting to be called`}
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="flex rounded-lg border border-line bg-panel p-0.5" role="group" aria-label="Date range">
-            {RANGES.map((range) => (
-              <button
-                key={range.days}
-                type="button"
-                onClick={() => setRangeDays(range.days)}
-                aria-pressed={rangeDays === range.days}
-                className={`rounded-md px-2.5 py-1 text-[12px] font-semibold transition-colors ${
-                  rangeDays === range.days
-                    ? "bg-accent text-inverse"
-                    : "text-muted hover:bg-hover hover:text-ink"
-                }`}
-              >
-                {range.label}
-              </button>
-            ))}
-          </div>
-          <Link to="/workspace" className="btn btn-primary btn-sm">
-            <Headset className="h-3.5 w-3.5" />
-            Start calling
-          </Link>
-        </div>
-      </header>
+      <PageHeader
+        title="Dashboard"
+        description={
+          analysis.calls > 0
+            ? `${analysis.calls} call${analysis.calls === 1 ? "" : "s"} in the last ${rangeDays} days · ${analysis.diallable} lead${analysis.diallable === 1 ? "" : "s"} left to work`
+            : `${analysis.diallable} lead${analysis.diallable === 1 ? "" : "s"} waiting to be called`
+        }
+        actions={
+          <>
+            <div
+              className="flex rounded-lg border border-line bg-panel p-0.5"
+              role="group"
+              aria-label="Date range"
+            >
+              {RANGES.map((range) => (
+                <button
+                  key={range.days}
+                  type="button"
+                  onClick={() => setRangeDays(range.days)}
+                  aria-pressed={rangeDays === range.days}
+                  className={`rounded px-2.5 py-1 text-xs font-semibold transition-colors ${
+                    rangeDays === range.days
+                      ? "bg-accent text-inverse"
+                      : "text-muted hover:bg-hover hover:text-ink"
+                  }`}
+                >
+                  {range.label}
+                </button>
+              ))}
+            </div>
+            <Link to="/workspace" className="btn btn-primary btn-sm">
+              <Headset className="h-3.5 w-3.5" />
+              Start calling
+            </Link>
+          </>
+        }
+      />
 
       {leads.length === 0 ? (
         <div className="card">
@@ -403,7 +407,7 @@ export function DashboardPage() {
               <section className="card p-4 lg:col-span-3">
                 <div className="mb-4 flex items-baseline justify-between gap-2">
                   <h2 className="text-sm font-semibold text-ink">Call volume</h2>
-                  <span className="text-[11px] text-faint">
+                  <span className="text-2xs text-faint">
                     every day in the window, including days with no calls
                   </span>
                 </div>
@@ -434,7 +438,7 @@ export function DashboardPage() {
             <section className="card p-4">
               <div className="mb-4 flex items-baseline justify-between gap-2">
                 <h2 className="text-sm font-semibold text-ink">Pipeline</h2>
-                <span className="text-[11px] text-faint">{leads.length} leads total</span>
+                <span className="text-2xs text-faint">{leads.length} leads total</span>
               </div>
               <BarChart
                 horizontal
@@ -447,7 +451,7 @@ export function DashboardPage() {
             <section className="card overflow-hidden">
               <div className="flex items-baseline justify-between gap-2 border-b border-line px-4 py-3">
                 <h2 className="text-sm font-semibold text-ink">Campaigns</h2>
-                <span className="text-[11px] text-faint">last {rangeDays} days</span>
+                <span className="text-2xs text-faint">last {rangeDays} days</span>
               </div>
 
               {analysis.campaignRows.length === 0 ? (
@@ -464,9 +468,9 @@ export function DashboardPage() {
                 />
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-[12px]">
+                  <table className="w-full text-left text-xs">
                     <thead>
-                      <tr className="border-b border-line text-[10px] uppercase tracking-wider text-faint">
+                      <tr className="border-b border-line text-2xs uppercase tracking-wider text-faint">
                         <th className="px-4 py-2 font-semibold">Campaign</th>
                         <th className="px-2 py-2 text-right font-semibold">Leads</th>
                         <th className="px-2 py-2 text-right font-semibold">Calls</th>
@@ -507,7 +511,7 @@ export function DashboardPage() {
               )}
 
               {analysis.unassignedCalls > 0 ? (
-                <p className="border-t border-line px-4 py-2 text-[11px] text-faint">
+                <p className="border-t border-line px-4 py-2 text-2xs text-faint">
                   {analysis.unassignedCalls} call{analysis.unassignedCalls === 1 ? "" : "s"} not
                   attributed to a campaign.
                 </p>
@@ -546,24 +550,24 @@ export function DashboardPage() {
                         {lead ? (
                           <Link
                             to={`/leads/${lead.id}`}
-                            className="truncate text-[13px] font-medium text-ink hover:text-accent"
+                            className="truncate text-sm font-medium text-ink hover:text-accent"
                           >
                             {name}
                           </Link>
                         ) : (
-                          <span className="truncate text-[13px] font-medium text-faint">{name}</span>
+                          <span className="truncate text-sm font-medium text-faint">{name}</span>
                         )}
                         {log.notes ? (
-                          <span className="block truncate text-[11px] text-faint">{log.notes}</span>
+                          <span className="block truncate text-2xs text-faint">{log.notes}</span>
                         ) : null}
                       </span>
-                      <span className={`chip shrink-0 !text-[10px] ${chipClass(tone)}`}>
+                      <span className={`chip shrink-0 !text-2xs ${chipClass(tone)}`}>
                         {outcomeLabel(log.outcome)}
                       </span>
-                      <span className="tabular w-14 shrink-0 text-right font-mono text-[11px] text-muted">
+                      <span className="tabular w-14 shrink-0 text-right font-mono text-2xs text-muted">
                         {log.duration_seconds > 0 ? formatMinutes(log.duration_seconds) : "—"}
                       </span>
-                      <span className="tabular hidden w-24 shrink-0 text-right text-[11px] text-faint sm:block">
+                      <span className="tabular hidden w-24 shrink-0 text-right text-2xs text-faint sm:block">
                         {new Date(at).toLocaleDateString(undefined, { day: "numeric", month: "short" })}
                       </span>
                     </li>

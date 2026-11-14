@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
   Download,
@@ -9,6 +9,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import { PageHeader } from "@/components/common/PageHeader";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { LeadGrid } from "@/components/leads/LeadGrid";
 import { CsvImport } from "@/components/leads/CsvImport";
@@ -75,6 +76,17 @@ export function LeadsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [campaignFilter, setCampaignFilter] = useState("all");
+  const [searchParams] = useSearchParams();
+
+  /**
+   * Honour `?campaign=<id>` so the Campaigns page can link straight into a
+   * filtered list. A link that opens the same unfiltered page it would have
+   * opened anyway is a control that looks like it does something.
+   */
+  const campaignParam = searchParams.get("campaign");
+  useEffect(() => {
+    if (campaignParam) setCampaignFilter(campaignParam);
+  }, [campaignParam]);
   const [countryFilter, setCountryFilter] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("created");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -272,33 +284,30 @@ export function LeadsPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-ink">Leads</h1>
-          <p className="mt-1 text-sm text-muted">
-            {leads.length === 0
-              ? "Nothing here yet — add a lead or import a file"
-              : `${filtered.length} of ${leads.length} shown${
-                  leadsQuery.isFetching ? " · updating" : ""
-                }`}
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <button type="button" onClick={handleExport} className="btn btn-secondary btn-sm">
-            <Download className="h-3.5 w-3.5" />
-            Export
-          </button>
-          <button type="button" onClick={() => setShowImport(true)} className="btn btn-secondary btn-sm">
-            <Upload className="h-3.5 w-3.5" />
-            Import
-          </button>
-          <button type="button" onClick={() => setShowForm(true)} className="btn btn-primary btn-sm">
-            <Plus className="h-3.5 w-3.5" />
-            Add lead
-          </button>
-        </div>
-      </header>
+      <PageHeader
+        title="Leads"
+        description={
+          leads.length === 0
+            ? "Nothing here yet — add a lead or import a file"
+            : `${filtered.length} of ${leads.length} shown${leadsQuery.isFetching ? " · updating" : ""}`
+        }
+        actions={
+          <>
+            <button type="button" onClick={handleExport} className="btn btn-secondary btn-sm">
+              <Download className="h-3.5 w-3.5" />
+              Export
+            </button>
+            <button type="button" onClick={() => setShowImport(true)} className="btn btn-secondary btn-sm">
+              <Upload className="h-3.5 w-3.5" />
+              Import
+            </button>
+            <button type="button" onClick={() => setShowForm(true)} className="btn btn-primary btn-sm">
+              <Plus className="h-3.5 w-3.5" />
+              Add lead
+            </button>
+          </>
+        }
+      />
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">
@@ -363,7 +372,7 @@ export function LeadsPage() {
             Clear
           </button>
         ) : (
-          <span className="flex items-center gap-1.5 text-[11px] text-faint">
+          <span className="flex items-center gap-1.5 text-2xs text-faint">
             <Filter className="h-3 w-3" />
             No filters
           </span>
@@ -373,7 +382,7 @@ export function LeadsPage() {
       {/* Bulk actions */}
       {selectedIds.size > 0 ? (
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-accent/40 bg-accent/12 px-3 py-2 animate-rise-in">
-          <span className="tabular text-[12px] font-semibold text-accent">
+          <span className="tabular text-xs font-semibold text-accent">
             {selectedIds.size} selected
           </span>
           <span className="hidden h-4 w-px bg-accent/30 sm:block" />
@@ -384,7 +393,7 @@ export function LeadsPage() {
               if (event.target.value) void handleBulkStatus(event.target.value as LeadStatus);
             }}
             aria-label="Set status for the selection"
-            className="input !w-auto !py-1 !text-[12px]"
+            className="input !w-auto !py-1 !text-xs"
           >
             <option value="">Set status…</option>
             {STATUS_FILTERS.filter((option) => option.value !== "all" && option.value !== "dnc").map(
@@ -453,10 +462,27 @@ export function LeadsPage() {
       {showImport ? (
         <CsvImport
           onClose={() => setShowImport(false)}
-          onImport={async (rows) => {
+          campaigns={campaigns.map((campaign) => ({ id: campaign.id, name: campaign.name }))}
+          defaultCampaignId={campaignFilter === "all" ? null : campaignFilter}
+          onImport={async (rows, importCampaignId) => {
             try {
-              const created = await createLeads.mutateAsync(rows as unknown as NewLead[]);
-              toast.success(`Imported ${created.length || rows.length} lead${rows.length === 1 ? "" : "s"}`);
+              const result = await createLeads.mutateAsync({
+                rows: rows as unknown as NewLead[],
+                campaignId: importCampaignId,
+              });
+              if (result.failed > 0) {
+                // A partial import has to say so: reporting "Imported 500" when
+                // 40 rows were refused sends the operator looking for leads that
+                // were never written.
+                const first = result.errors[0];
+                toast.error(
+                  `Imported ${result.imported}, ${result.failed} failed${
+                    first ? ` — row ${first.row}: ${first.reason}` : ""
+                  }`,
+                );
+              } else {
+                toast.success(`Imported ${result.imported} lead${result.imported === 1 ? "" : "s"}`);
+              }
               setShowImport(false);
             } catch (error) {
               toast.error(error instanceof Error ? error.message : "The import failed");

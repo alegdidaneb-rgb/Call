@@ -5,8 +5,8 @@ import { bindShortcuts, keyName, pushOverlay } from "@/lib/keys";
 /**
  * A destructive-action confirmation.
  *
- * Two things were wrong with this beyond the styling. It read `bg-black/50` and
- * `text-white`, which are absolute colours that ignore the theme — so it looked
+ * Two things were wrong with this beyond the styling. It read `bg-overlay/50` and
+ * `text-inverse`, which are absolute colours that ignore the theme — so it looked
  * identical in light mode and dark mode and matched neither. And it registered no
  * way for the rest of the app to know it was open, which matters now that several
  * screens bind single-key shortcuts: pressing `d` behind a "delete this lead?"

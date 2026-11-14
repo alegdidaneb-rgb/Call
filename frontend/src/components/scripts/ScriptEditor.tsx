@@ -176,7 +176,7 @@ export function ScriptEditor({ script, campaigns, onClose, onSave }: ScriptEdito
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-[11px] leading-relaxed text-faint">
+              <p className="mt-1 text-2xs leading-relaxed text-faint">
                 A lead in that campaign is shown this script in the workspace. Otherwise the general
                 script is used.
               </p>
@@ -213,7 +213,7 @@ export function ScriptEditor({ script, campaigns, onClose, onSave }: ScriptEdito
             </div>
 
             {objections.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-line px-3 py-4 text-center text-[12px] text-faint">
+              <p className="rounded-lg border border-dashed border-line px-3 py-4 text-center text-xs text-faint">
                 No objections yet. Add the ones you actually hear, with the answer that works.
               </p>
             ) : (
@@ -226,7 +226,7 @@ export function ScriptEditor({ script, campaigns, onClose, onSave }: ScriptEdito
                         onChange={(event) => updateObjection(index, { objection: event.target.value })}
                         placeholder="“Send me an email instead”"
                         aria-label={`Objection ${index + 1}`}
-                        className="input !py-1.5 !text-[13px] font-medium"
+                        className="input !py-1.5 !text-sm font-medium"
                       />
                       <button
                         type="button"
@@ -243,14 +243,14 @@ export function ScriptEditor({ script, campaigns, onClose, onSave }: ScriptEdito
                       rows={2}
                       placeholder="The answer that works"
                       aria-label={`Response to objection ${index + 1}`}
-                      className="input resize-y !py-1.5 !text-[13px] leading-relaxed"
+                      className="input resize-y !py-1.5 !text-sm leading-relaxed"
                     />
                     <input
                       value={draft.category}
                       onChange={(event) => updateObjection(index, { category: event.target.value })}
                       placeholder="Category (optional)"
                       aria-label={`Category for objection ${index + 1}`}
-                      className="input !py-1 !text-[11px]"
+                      className="input !py-1 !text-2xs"
                     />
                   </li>
                 ))}
@@ -265,12 +265,12 @@ export function ScriptEditor({ script, campaigns, onClose, onSave }: ScriptEdito
               onChange={(event) => setIsActive(event.target.checked)}
               className="h-4 w-4 rounded border-line-strong bg-panel"
             />
-            <span className="text-[13px] text-ink">Active</span>
-            <span className="text-[11px] text-faint">— inactive scripts are not shown to agents</span>
+            <span className="text-sm text-ink">Active</span>
+            <span className="text-2xs text-faint">— inactive scripts are not shown to agents</span>
           </label>
 
           {error ? (
-            <p className="rounded-lg bg-danger/12 px-3 py-2 text-[12px] text-danger">{error}</p>
+            <p className="rounded-lg bg-danger/12 px-3 py-2 text-xs text-danger">{error}</p>
           ) : null}
         </div>
 

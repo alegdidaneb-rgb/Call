@@ -40,7 +40,7 @@ function Group({ title, rows }: { title: string; rows: Array<[string, string]> }
             <dt className="shrink-0">
               <span className="kbd">{key}</span>
             </dt>
-            <dd className="flex-1 text-right text-[12px] leading-relaxed text-muted">{description}</dd>
+            <dd className="flex-1 text-right text-xs leading-relaxed text-muted">{description}</dd>
           </div>
         ))}
       </dl>
@@ -97,7 +97,7 @@ export function ShortcutsOverlay({ onClose }: ShortcutsOverlayProps) {
             rows={STATUS_ACTIONS.map((action) => [action.key, action.label] as [string, string])}
           />
 
-          <p className="rounded-lg bg-inset px-3 py-2 text-[11px] leading-relaxed text-faint">
+          <p className="rounded-lg bg-inset px-3 py-2 text-2xs leading-relaxed text-faint">
             Shortcuts are ignored while you are typing in a field, and while a
             dialog is open. <span className="kbd">⌘K</span> opens the command
             palette from anywhere in the app.

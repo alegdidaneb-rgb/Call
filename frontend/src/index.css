@@ -200,7 +200,7 @@ html[data-density="compact"] {
      discoverable at the moment it is useful rather than in a help page. */
   .kbd {
     @apply inline-flex items-center justify-center rounded border border-line-strong
-           bg-inset font-mono text-[10px] font-semibold leading-none text-faint;
+           bg-inset font-mono text-2xs font-semibold leading-none text-faint;
     min-width: 1.3rem;
     height: 1.3rem;
     padding: 0 0.3rem;
@@ -215,7 +215,7 @@ html[data-density="compact"] {
     @apply flex shrink-0 items-center justify-between gap-2 border-b border-line px-3 py-2;
   }
   .pane-title {
-    @apply text-[11px] font-semibold uppercase tracking-wider text-faint;
+    @apply text-2xs font-semibold uppercase tracking-wider text-faint;
   }
   .pane-body {
     @apply min-h-0 flex-1 overflow-y-auto;

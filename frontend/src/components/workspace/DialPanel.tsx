@@ -123,7 +123,7 @@ export function DialPanel({
     >
       <div className="pane-head">
         <span className="pane-title">Dial</span>
-        <span className={`chip !text-[10px] ${registered ? chipClass("success") : chipClass("warning")}`}>
+        <span className={`chip !text-2xs ${registered ? chipClass("success") : chipClass("warning")}`}>
           <span className={`h-1.5 w-1.5 rounded-full ${dotClass(registered ? "success" : "warning")}`} />
           {registered ? "Trunk ready" : "No trunk"}
         </span>
@@ -143,7 +143,7 @@ export function DialPanel({
 
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-faint">
+                <p className="text-2xs font-semibold uppercase tracking-wider text-faint">
                   {inCall ? callPhase(snapshot) : "Ready"}
                 </p>
                 <p className="mt-1 truncate text-base font-semibold text-ink">
@@ -176,16 +176,16 @@ export function DialPanel({
             {/* What the number will be dialled as, and why it cannot be. */}
             {!inCall && lead ? (
               target.warning ? (
-                <p className="mt-3 flex items-start gap-1.5 rounded-lg bg-warning/12 px-2.5 py-2 text-[11px] leading-relaxed text-warning">
+                <p className="mt-3 flex items-start gap-1.5 rounded-lg bg-warning/12 px-2.5 py-2 text-2xs leading-relaxed text-warning">
                   <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" />
                   <span>{target.warning}</span>
                 </p>
               ) : target.target ? (
-                <p className="mt-3 truncate text-[11px] text-faint">
+                <p className="mt-3 truncate text-2xs text-faint">
                   Will dial <span className="font-mono text-muted">{target.target}</span>
                 </p>
               ) : (
-                <p className="mt-3 text-[11px] text-faint">This lead has no phone number.</p>
+                <p className="mt-3 text-2xs text-faint">This lead has no phone number.</p>
               )
             ) : null}
           </div>
@@ -199,7 +199,7 @@ export function DialPanel({
             >
               <PhoneOff className="h-5 w-5" />
               End call
-              <span className="kbd ml-1 !border-white/30 !bg-black/20 !text-white/90">d</span>
+              <span className="kbd ml-1 !border-inverse/30 !bg-overlay/20 !text-inverse/90">d</span>
             </button>
           ) : (
             <button
@@ -215,12 +215,12 @@ export function DialPanel({
                 <Phone className="h-5 w-5" />
               )}
               {lead ? "Call lead" : "No lead selected"}
-              <span className="kbd ml-1 !border-inverse/30 !bg-black/20 !text-inverse/90">d</span>
+              <span className="kbd ml-1 !border-inverse/30 !bg-overlay/20 !text-inverse/90">d</span>
             </button>
           )}
 
           {!registered && !inCall ? (
-            <p className="flex items-start gap-1.5 rounded-lg bg-warning/12 px-2.5 py-2 text-[11px] leading-relaxed text-warning">
+            <p className="flex items-start gap-1.5 rounded-lg bg-warning/12 px-2.5 py-2 text-2xs leading-relaxed text-warning">
               <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" />
               <span>
                 {snapshot.failure?.hint ??
@@ -244,7 +244,7 @@ export function DialPanel({
 
           {/* A failure the operator has to act on */}
           {snapshot.failure && registered ? (
-            <p className="flex items-start gap-1.5 rounded-lg bg-danger/12 px-2.5 py-2 text-[11px] leading-relaxed text-danger">
+            <p className="flex items-start gap-1.5 rounded-lg bg-danger/12 px-2.5 py-2 text-2xs leading-relaxed text-danger">
               <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" />
               <span>
                 <strong className="font-semibold">{snapshot.failure.message}</strong>
@@ -260,7 +260,7 @@ export function DialPanel({
               onClick={() => sipEngine.setMuted(!snapshot.muted)}
               disabled={!inCall}
               aria-pressed={snapshot.muted}
-              className={`btn btn-secondary flex-col !gap-1 !py-2.5 !text-[11px] ${
+              className={`btn btn-secondary flex-col !gap-1 !py-2.5 !text-2xs ${
                 snapshot.muted ? `${borderClass("warning")} ${textClass("warning")}` : ""
               }`}
             >
@@ -274,7 +274,7 @@ export function DialPanel({
               onClick={() => void sipEngine.setHeld(snapshot.callState !== "held")}
               disabled={!inCall}
               aria-pressed={snapshot.callState === "held"}
-              className={`btn btn-secondary flex-col !gap-1 !py-2.5 !text-[11px] ${
+              className={`btn btn-secondary flex-col !gap-1 !py-2.5 !text-2xs ${
                 snapshot.callState === "held" ? `${borderClass("info")} ${textClass("info")}` : ""
               }`}
             >
@@ -292,7 +292,7 @@ export function DialPanel({
               onClick={() => setKeypadOpen((open) => !open)}
               disabled={!inCall}
               aria-expanded={keypadOpen}
-              className="btn btn-secondary flex-col !gap-1 !py-2.5 !text-[11px]"
+              className="btn btn-secondary flex-col !gap-1 !py-2.5 !text-2xs"
             >
               <Keyboard className="h-4 w-4" />
               Keypad
@@ -318,7 +318,7 @@ export function DialPanel({
           <div className="space-y-2 border-t border-line pt-3">
             <div className="flex items-baseline justify-between">
               <h3 className="pane-title">Disposition</h3>
-              <span className="text-[10px] text-faint">
+              <span className="text-2xs text-faint">
                 {chosen ? `last call: ${chosen.replace(/_/g, " ")}` : "or press 1–7"}
               </span>
             </div>
@@ -334,7 +334,7 @@ export function DialPanel({
                     disabled={saving || !lead}
                     title={option.hint}
                     aria-pressed={isChosen}
-                    className={`group flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-left text-[11px] font-semibold transition-all duration-100 ${
+                    className={`group flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-left text-2xs font-semibold transition-all duration-100 ${
                       isChosen
                         ? `${chipClass(option.tone)} ${borderClass(option.tone)}`
                         : "border-line bg-panel text-muted hover:border-line-strong hover:bg-hover hover:text-ink"
@@ -360,7 +360,7 @@ export function DialPanel({
                 onChange={(event) => setNotes(event.target.value)}
                 rows={3}
                 placeholder="What was said, what happens next"
-                className="input resize-y !text-[13px] leading-relaxed"
+                className="input resize-y !text-sm leading-relaxed"
               />
             </div>
           </div>
@@ -369,7 +369,7 @@ export function DialPanel({
           <div className="space-y-2 border-t border-line pt-3">
             <div className="flex items-baseline justify-between">
               <h3 className="pane-title">Lead status</h3>
-              <span className="text-[10px] text-faint">no call needed</span>
+              <span className="text-2xs text-faint">no call needed</span>
             </div>
             <div className="grid grid-cols-2 gap-1.5">
               {STATUS_ACTIONS.map((action) => (
@@ -379,7 +379,7 @@ export function DialPanel({
                   onClick={() => void onStatusAction(action.value)}
                   disabled={saving || !lead}
                   title={action.hint}
-                  className="flex items-center gap-1.5 rounded-lg border border-line bg-panel px-2 py-1.5 text-left text-[11px] font-semibold text-muted transition-colors hover:border-line-strong hover:bg-hover hover:text-ink disabled:pointer-events-none disabled:opacity-50"
+                  className="flex items-center gap-1.5 rounded-lg border border-line bg-panel px-2 py-1.5 text-left text-2xs font-semibold text-muted transition-colors hover:border-line-strong hover:bg-hover hover:text-ink disabled:pointer-events-none disabled:opacity-50"
                 >
                   <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotClass(action.tone)}`} />
                   <span className="min-w-0 flex-1 truncate">{action.label}</span>
@@ -392,7 +392,7 @@ export function DialPanel({
           {user?.role === "admin" ? (
             <Link
               to="/phone"
-              className="flex items-center gap-1.5 text-[11px] text-faint transition-colors hover:text-muted"
+              className="flex items-center gap-1.5 text-2xs text-faint transition-colors hover:text-muted"
             >
               <Settings className="h-3 w-3" />
               Phone and trunk settings

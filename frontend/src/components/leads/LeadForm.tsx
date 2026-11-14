@@ -137,11 +137,11 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
     "w-full px-3 py-2 border border-line-strong rounded-lg text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-panel rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50 p-4">
+      <div className="bg-panel rounded-xl shadow-raised max-w-lg w-full max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-5 border-b border-line">
           <h2 className="text-lg font-semibold text-ink">
-            {initialData?.first_name ? "Edit Lead" : "New Lead"}
+            {initialData?.first_name ? "Edit lead" : "New lead"}
           </h2>
           <button onClick={onClose} className="text-faint hover:text-muted">
             <X className="w-5 h-5" />
@@ -150,7 +150,7 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-ink mb-1">First Name</label>
+              <label className="block text-sm font-medium text-ink mb-1">First name</label>
               <input
                 type="text"
                 value={formData.first_name}
@@ -161,7 +161,7 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-ink mb-1">Last Name</label>
+              <label className="block text-sm font-medium text-ink mb-1">Last name</label>
               <input
                 type="text"
                 value={formData.last_name}
@@ -314,10 +314,10 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
                 <option value="new">New</option>
                 <option value="contacted">Contacted</option>
                 <option value="interested">Interested</option>
-                <option value="not_interested">Not Interested</option>
+                <option value="not_interested">Not interested</option>
                 <option value="callback">Callback</option>
                 <option value="converted">Converted</option>
-                <option value="do_not_contact">Do Not Contact</option>
+                <option value="do_not_contact">Do not contact</option>
               </select>
             </div>
           </div>
@@ -332,7 +332,7 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
             </button>
             <button
               type="submit"
-              className="px-4 py-2 text-sm font-medium text-white bg-accent hover:bg-accent-strong rounded-lg transition"
+              className="px-4 py-2 text-sm font-medium text-inverse bg-accent hover:bg-accent-strong rounded-lg transition"
             >
               Save Lead
             </button>

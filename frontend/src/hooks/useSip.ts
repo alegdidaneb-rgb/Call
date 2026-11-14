@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { api } from "@/lib/apiClient";
+import { api, isApiMode } from "@/lib/apiClient";
+import { isProvisioned, normaliseRole, type AppRole } from "@/types/app";
 import { supabase } from "@/lib/supabase";
 import {
   SIP_PROVIDERS,
@@ -16,10 +17,29 @@ import { sipEngine, type SipEngineSnapshot } from "@/sip/engine";
 import type { Database } from "@/types/database";
 
 type SipAccountRow = Database["public"]["Tables"]["sip_accounts"]["Row"];
-type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 
-/** Self-hosted deployments talk to the Express API instead of Supabase. */
-const isApiMode = Boolean(import.meta.env.VITE_API_URL);
+/**
+ * Someone a trunk can be assigned to.
+ *
+ * The two deployment modes return different field names for the same person:
+ * Supabase gives a `profiles` row with `full_name`, the Express API gives the
+ * public user shape with `fullName`. This hook used to declare the Supabase type
+ * and cast the API response into it, so in API mode `full_name` was always
+ * undefined and the assignment dropdown quietly showed email addresses instead
+ * of names. Normalising here means neither caller can be wrong.
+ */
+export interface AssignablePerson {
+  id: string;
+  email: string | null;
+  fullName: string | null;
+  role: AppRole;
+  /**
+   * Whether an administrator has onboarded this account. An unprovisioned agent
+   * can read no data under RLS, so assigning a trunk to one is a no-op and the
+   * Administration page reports it.
+   */
+  provisioned: boolean;
+}
 
 export interface SipAccountPayload {
   label: string | null;
@@ -187,11 +207,31 @@ export function useSipAccountsAdmin() {
 
   const profiles = useQuery({
     queryKey: ["profiles-for-assignment"],
-    queryFn: async (): Promise<ProfileRow[]> => {
-      if (isApiMode) return (await api.users.list()) as ProfileRow[];
-      const { data, error } = await supabase.from("profiles").select("id, email, full_name, role");
+    queryFn: async (): Promise<AssignablePerson[]> => {
+      if (isApiMode) {
+        const users = await api.users.list();
+        return users.map((user) => ({
+          id: user.id,
+          email: user.email,
+          fullName: user.fullName,
+          role: user.role,
+          provisioned: user.provisioned,
+        }));
+      }
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, email, full_name, role, invited_by");
       if (error) throw error;
-      return (data ?? []) as ProfileRow[];
+      return (data ?? []).map((row) => {
+        const role = normaliseRole(row.role);
+        return {
+          id: row.id,
+          email: row.email,
+          fullName: row.full_name,
+          role,
+          provisioned: isProvisioned(role, row.invited_by),
+        };
+      });
     },
   });
 

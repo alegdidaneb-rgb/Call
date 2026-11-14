@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- One page header (`components/common/PageHeader.tsx`), now used by every page.
+  Eleven screens each hand-rolled their own title, at four different sizes, with
+  the description sometimes present and the actions variously beside, below or
+  missing — inconsistency that is invisible one page at a time and obvious the
+  moment somebody clicks between them
+- A product mark (`components/common/Brand.tsx`), drawn inline rather than
+  borrowed from an icon set, and a shared `AuthScreen` shell behind both
+  unauthenticated screens
+- A password field with a reveal toggle and a requirement checklist that updates
+  on every keystroke, so the policy is visible while the operator types instead of
+  being reported as a refusal afterwards
+- `lib/passwordPolicy.ts`: the policy had three independent definitions — two
+  near-identical zod schemas and a checklist — so validation and display could
+  disagree. Both schemas and the checklist now derive from one list of rules
+- CSV import matches columns automatically, exactly first then by alias, so an
+  import no longer begins with thirteen empty dropdowns. It names the chosen file
+  and its row count, warns when no column maps to a phone number, splits a single
+  "Full name" column, previews the first three rows as they will be saved, and can
+  attribute the import to a campaign
+- `/leads?campaign=<id>`, so a campaign card links to its own leads rather than to
+  the same unfiltered page it would have opened anyway
+- An administration page that administers: seven readiness checks (trunk, secure
+  origin, data path, accounts, leads, calls, scripts) each stating what was found
+  and what to do about it, plus a plain-language account of how the deployment
+  handles SIP credentials
+- `ApiError`, carrying the HTTP status so a caller can tell a 409 from a 500
+
 - A calling workspace at `/workspace`: the lead queue, the lead being called and
   the call controls in three independently scrolling panes, so working a list
   never costs a navigation. It is the landing route now, because it is the screen
@@ -110,6 +137,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Type, corner-radius and elevation are now scales rather than whatever each
+  component reached for: eight text sizes with the line height attached, five
+  radii, three shadows reading `var(--shadow-*)`. `rounded-md`, `rounded-2xl` and
+  the stock `shadow-sm`–`shadow-2xl` were removed from the config rather than
+  aliased, so an off-scale value cannot be reintroduced without a build failure
+- 191 hand-picked values across 29 files were migrated onto those scales —
+  123 arbitrary `text-[Npx]` sizes, four `rounded-md`, three `rounded-2xl`,
+  nineteen stock shadows, and 42 uses of absolute `white`/`black`, which were
+  removed from the palette entirely because they ignored the theme
+- Interface copy is sentence case throughout, with proper nouns and the product
+  name excepted. 32 strings changed, including "Call History" → "Call history",
+  "Avg Duration" → "Average duration" and "Do Not Contact" → "Do not contact"
+- `StatusBadge` resolves its vocabulary from `lib/outcomes` instead of carrying
+  its own 27-entry colour table, and the softphone uses the shared disposition
+  definitions instead of a local copy of the same seven codes
+- Campaign cards report what an operator actually wants to know about a campaign —
+  leads, how far through them the team is, connect rate, conversions and when it
+  was last worked — rather than a name, a type and a creation date
+- The API client is typed end to end. All 32 `any` annotations are gone, and the
+  types come from the same `types/database.ts` the Supabase path is checked
+  against, so the two deployment modes cannot drift apart silently
+- One definition of the deployment-mode flag, exported from `lib/apiClient`; five
+  per-file copies of `const isApiMode = Boolean(...)` were removed
+
 - The dashboard measures a window the operator chooses (7, 14 or 30 days) and
   compares it with the window before it, rather than printing six lifetime totals.
   Call volume, connect rate, talk time and queue remaining, each with a trend;
@@ -159,6 +210,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- The last hardcoded `SAMPLE_SCRIPT`. The workspace script panel was rewritten
+  onto `useScriptFor(campaignId)` two turns after the scripts page was, and
+  continued to show a fictional script for a lead whose campaign had none
+- The campaign "Settings (JSON)" textarea. Nothing in the app reads
+  `campaigns.settings`, so it asked operators to hand-write JSON no screen ever
+  interpreted, and a syntax error in it blocked saving a campaign whose other
+  fields were fine. Anything already stored is passed through untouched
+- The duplicate `isTypingTarget` in `Layout.tsx`, now imported from `lib/keys`
+
 - The hardcoded `SAMPLE_SCRIPT`, which was rendered by both the Scripts page and
   the script viewer out of `useState`. An agent following it was reading a script
   no administrator had written and could not change — worse than no script panel,
@@ -184,6 +244,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   this project
 
 ### Fixed
+
+- The same call outcome was two different colours depending on which screen you
+  read it on: the badge painted `busy` red and `wrong_number` grey while
+  `lib/outcomes` painted `busy` amber and `wrong_number` red
+- Trunk assignment showed email addresses instead of names in API mode.
+  `/api/users` has always returned `fullName`; the client declared the response a
+  `profiles` row with `full_name` and cast it, so the property was undefined
+- Choosing the same CSV file twice did nothing: "Change file" cleared the parsed
+  rows without clearing the input, so the second selection fired no change event
+- The Edit button on a campaign card set state that nothing ever read, so clicking
+  it did nothing at all
+- A bulk import through the API made one round trip per row — the exact cost the
+  bulk endpoint exists to avoid — and dropped the `campaign_id` the server
+  accepts, so an import could never be attributed to a campaign
+- An import that partially failed reported the number submitted rather than the
+  number written, sending the operator looking for leads that were never stored
+- A rejected setup-status check became an unhandled promise rejection, and left
+  the setup screen showing a spinner forever
+- Sign-in labels were not associated with their inputs, and neither field carried
+  `autoComplete`, so password managers could neither fill nor offer to save
+- `text-${tone}` composed at runtime, which Tailwind cannot see and would have
+  compiled to nothing — caught before it shipped by scanning the built CSS for
+  every utility referenced in source
 
 - `call_count` and `last_called_at` are written from the workspace. They were
   rendered on the lead page and only ever written from there, so a lead dialled

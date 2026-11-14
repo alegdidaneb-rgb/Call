@@ -64,7 +64,7 @@ function PendingActivation({ email }: { email: string | null }) {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-app px-4">
-      <div className="max-w-md w-full bg-panel rounded-2xl shadow-sm border border-line p-8 text-center">
+      <div className="max-w-md w-full bg-panel rounded-xl shadow-panel border border-line p-8 text-center">
         <h1 className="text-lg font-bold text-ink">Waiting for an administrator</h1>
         <p className="text-sm text-muted mt-2">
           {email ? `The account ${email} ` : "This account "}

@@ -145,8 +145,8 @@ export function BarChart({
         {data.map((datum) => (
           <li key={datum.label} className="space-y-1">
             <div className="flex items-baseline justify-between gap-3">
-              <span className="truncate text-[12px] font-medium text-ink">{datum.label}</span>
-              <span className="tabular shrink-0 text-[11px] font-semibold text-muted">
+              <span className="truncate text-xs font-medium text-ink">{datum.label}</span>
+              <span className="tabular shrink-0 text-2xs font-semibold text-muted">
                 {datum.display ?? datum.value}
               </span>
             </div>
@@ -169,7 +169,7 @@ export function BarChart({
     <div className="flex items-end gap-1.5" style={{ height }}>
       {data.map((datum) => (
         <div key={datum.label} className="group flex min-w-0 flex-1 flex-col items-center justify-end gap-1.5">
-          <span className="tabular text-[10px] font-semibold text-faint opacity-0 transition-opacity group-hover:opacity-100">
+          <span className="tabular text-2xs font-semibold text-faint opacity-0 transition-opacity group-hover:opacity-100">
             {datum.display ?? datum.value}
           </span>
           <div
@@ -181,7 +181,7 @@ export function BarChart({
             }}
             title={`${datum.label}: ${datum.display ?? datum.value}`}
           />
-          <span className="w-full truncate text-center text-[10px] text-faint">{datum.label}</span>
+          <span className="w-full truncate text-center text-2xs text-faint">{datum.label}</span>
         </div>
       ))}
     </div>
@@ -273,7 +273,7 @@ export function Donut({
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span className="tabular text-xl font-bold text-ink">{centreValue}</span>
             {centreLabel ? (
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-faint">
+              <span className="text-2xs font-semibold uppercase tracking-wider text-faint">
                 {centreLabel}
               </span>
             ) : null}
@@ -289,9 +289,9 @@ export function Donut({
               style={{ backgroundColor: cssColor(segment.tone) }}
               aria-hidden="true"
             />
-            <span className="min-w-0 flex-1 truncate text-[12px] text-muted">{segment.label}</span>
-            <span className="tabular shrink-0 text-[12px] font-semibold text-ink">{segment.value}</span>
-            <span className="tabular w-10 shrink-0 text-right text-[11px] text-faint">
+            <span className="min-w-0 flex-1 truncate text-xs text-muted">{segment.label}</span>
+            <span className="tabular shrink-0 text-xs font-semibold text-ink">{segment.value}</span>
+            <span className="tabular w-10 shrink-0 text-right text-2xs text-faint">
               {total > 0 ? `${Math.round((segment.value / total) * 100)}%` : "—"}
             </span>
           </li>

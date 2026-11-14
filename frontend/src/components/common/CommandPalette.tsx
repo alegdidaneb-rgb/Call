@@ -219,13 +219,13 @@ export function CommandPalette({ role, onClose }: CommandPaletteProps) {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-start justify-center px-4 pt-[12vh]">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]" onClick={onClose} aria-hidden />
+      <div className="absolute inset-0 bg-overlay/60 backdrop-blur-[2px]" onClick={onClose} aria-hidden />
 
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Command palette"
-        className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-line bg-panel shadow-floating"
+        className="relative w-full max-w-xl overflow-hidden rounded-xl border border-line bg-panel shadow-floating"
         onKeyDown={handleKeyDown}
       >
         <div className="flex items-center gap-3 border-b border-line px-4">
@@ -238,7 +238,7 @@ export function CommandPalette({ role, onClose }: CommandPaletteProps) {
             aria-label="Search leads or jump to a page"
             className="w-full bg-transparent py-3.5 text-sm text-ink outline-none placeholder:text-faint"
           />
-          <kbd className="hidden shrink-0 rounded border border-line bg-inset px-1.5 py-0.5 font-mono text-[10px] text-faint sm:block">
+          <kbd className="hidden shrink-0 rounded border border-line bg-inset px-1.5 py-0.5 font-mono text-2xs text-faint sm:block">
             ESC
           </kbd>
         </div>
@@ -261,7 +261,7 @@ export function CommandPalette({ role, onClose }: CommandPaletteProps) {
             return (
               <React.Fragment key={command.id}>
                 {showGroup && (
-                  <p className="px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-faint first:pt-1">
+                  <p className="px-3 pb-1 pt-3 text-2xs font-semibold uppercase tracking-wider text-faint first:pt-1">
                     {command.group}
                   </p>
                 )}
@@ -292,7 +292,7 @@ export function CommandPalette({ role, onClose }: CommandPaletteProps) {
           })}
         </div>
 
-        <div className="flex items-center justify-between border-t border-line bg-inset px-4 py-2 text-[11px] text-faint">
+        <div className="flex items-center justify-between border-t border-line bg-inset px-4 py-2 text-2xs text-faint">
           <span className="flex items-center gap-1.5">
             <CornerDownLeft className="h-3 w-3" /> to open · ↑↓ to move · esc to close
           </span>

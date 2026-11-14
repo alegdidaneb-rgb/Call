@@ -1,10 +1,10 @@
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import { api, setAuthToken } from "@/lib/apiClient";
+import { api, isApiMode, setAuthToken } from "@/lib/apiClient";
 import { isProvisioned, normaliseRole, type AppRole, type AppUser } from "@/types/app";
 
-const API_URL = import.meta.env.VITE_API_URL || "";
-export const isApiMode = Boolean(API_URL);
+/** Re-exported for existing callers; the definition lives in `apiClient`. */
+export { isApiMode };
 
 /**
  * A dev-only stand-in user. It must never be reachable from a production build:
@@ -56,7 +56,9 @@ export interface TeamMember {
  * `context` holds the real `Response`, so without this the UI would display
  * "Edge Function returned a non-200 status code" instead of the reason.
  */
-async function invokeUsersFunction(body: Record<string, unknown>): Promise<any> {
+async function invokeUsersFunction(
+  body: Record<string, unknown>,
+): Promise<Record<string, unknown> | null> {
   const { data, error } = await supabase.functions.invoke(USERS_FUNCTION, { body });
   if (error) {
     let message = error.message || "Request failed";
@@ -71,7 +73,7 @@ async function invokeUsersFunction(body: Record<string, unknown>): Promise<any> 
     }
     throw new Error(message);
   }
-  return data;
+  return (data ?? null) as Record<string, unknown> | null;
 }
 
 /** True while the deployment has no administrator and setup is still possible. */

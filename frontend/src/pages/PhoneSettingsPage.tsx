@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { PageHeader } from "@/components/common/PageHeader";
 import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import {
@@ -149,7 +150,7 @@ export function PhoneSettingsPage() {
     return (id: string | null) => {
       if (!id) return "Shared trunk default";
       const profile = byId.get(id);
-      return profile?.full_name || profile?.email || "Unknown user";
+      return profile?.fullName || profile?.email || "Unknown user";
     };
   }, [profiles]);
 
@@ -246,7 +247,7 @@ export function PhoneSettingsPage() {
   if (accountsQuery.isError) {
     return (
       <div className="space-y-6">
-        <PageHeader />
+        <PhoneHeader />
         <div className="rounded-xl border border-danger/30 bg-danger/12 p-5 text-sm text-danger">
           <p className="font-semibold">Could not load the phone settings.</p>
           <p className="mt-1">
@@ -261,7 +262,7 @@ export function PhoneSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader />
+      <PhoneHeader />
 
       {!trunkDefault && accounts.length === 0 && (
         <div className="rounded-xl border border-warning/30 bg-warning/12 p-5">
@@ -296,7 +297,7 @@ export function PhoneSettingsPage() {
               setErrors([]);
               setTestResult(null);
             }}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent-strong transition"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-accent text-inverse text-sm font-medium hover:bg-accent-strong transition"
           >
             <Plus className="w-4 h-4" />
             Add account
@@ -318,7 +319,7 @@ export function PhoneSettingsPage() {
                   <p className="text-sm font-medium text-ink truncate">
                     {row.label || row.sip_uri}
                     {row.user_id === null && (
-                      <span className="ml-2 inline-flex items-center gap-1 text-[11px] font-normal text-muted">
+                      <span className="ml-2 inline-flex items-center gap-1 text-2xs font-normal text-muted">
                         <Shield className="w-3 h-3" />
                         shared default
                       </span>
@@ -332,7 +333,7 @@ export function PhoneSettingsPage() {
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   <span
-                    className={`text-[11px] px-2 py-0.5 rounded-full ${
+                    className={`text-2xs px-2 py-0.5 rounded-full ${
                       row.enabled ? "bg-success/12 text-success" : "bg-hover text-muted"
                     }`}
                   >
@@ -407,14 +408,14 @@ export function PhoneSettingsPage() {
                   <option value="">Shared trunk default (everyone)</option>
                   {profiles.map((profile) => (
                     <option key={profile.id} value={profile.id}>
-                      {profile.full_name || profile.email || profile.id} ({profile.role})
+                      {profile.fullName || profile.email || profile.id} ({profile.role})
                     </option>
                   ))}
                 </select>
               </Field>
 
               {!SIP_PRESETS[form.provider].browserReady && (
-                <div className="rounded-md border border-warning/30 bg-warning/12 p-3 text-xs text-warning">
+                <div className="rounded border border-warning/30 bg-warning/12 p-3 text-xs text-warning">
                   <p className="font-semibold">
                     {SIP_PRESETS[form.provider].label} has no SIP-over-WebSocket endpoint
                   </p>
@@ -574,7 +575,7 @@ export function PhoneSettingsPage() {
               <button
                 onClick={handleSave}
                 disabled={saveMutation.isPending}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent text-white text-sm font-semibold hover:bg-accent-strong disabled:opacity-50 transition"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent text-inverse text-sm font-semibold hover:bg-accent-strong disabled:opacity-50 transition"
               >
                 {saveMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                 Save
@@ -603,8 +604,8 @@ export function PhoneSettingsPage() {
       </section>
 
       {confirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-panel rounded-xl shadow-xl max-w-sm w-full p-6 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50 p-4">
+          <div className="bg-panel rounded-xl shadow-raised max-w-sm w-full p-6 space-y-4">
             <h3 className="text-base font-semibold text-ink">Remove this account?</h3>
             <p className="text-sm text-muted">
               {confirmDelete.label || confirmDelete.sip_uri} will no longer be able to register.
@@ -628,7 +629,7 @@ export function PhoneSettingsPage() {
                   })
                 }
                 disabled={deleteMutation.isPending}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-danger text-white text-sm font-semibold hover:bg-danger/90 disabled:opacity-50 transition"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-danger text-inverse text-sm font-semibold hover:bg-danger/90 disabled:opacity-50 transition"
               >
                 {deleteMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                 Remove
@@ -657,19 +658,16 @@ function Field({
     <label className="block">
       <span className="block text-xs font-medium text-muted mb-1">{label}</span>
       {children}
-      {hint && <span className="block text-[11px] text-faint mt-1 font-mono">{hint}</span>}
+      {hint && <span className="block text-2xs text-faint mt-1 font-mono">{hint}</span>}
     </label>
   );
 }
 
-function PageHeader() {
+function PhoneHeader() {
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-ink">Phone</h1>
-      <p className="text-sm text-muted mt-1">
-        SIP credentials for the browser softphone. Calls are placed over WebRTC through your SIP
-        provider.
-      </p>
-    </div>
+    <PageHeader
+      title="Phone"
+      description="SIP credentials for the browser softphone. Calls are placed over WebRTC through your SIP provider."
+    />
   );
 }

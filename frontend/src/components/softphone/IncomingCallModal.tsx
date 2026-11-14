@@ -17,8 +17,8 @@ export function IncomingCallModal() {
   if (!isIncoming) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-panel rounded-xl shadow-xl max-w-sm w-full p-6 text-center space-y-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50 p-4">
+      <div className="bg-panel rounded-xl shadow-raised max-w-sm w-full p-6 text-center space-y-4">
         <div className="w-16 h-16 rounded-full bg-success/12 flex items-center justify-center mx-auto animate-pulse">
           <PhoneIncoming className="w-8 h-8 text-success" />
         </div>
@@ -31,7 +31,7 @@ export function IncomingCallModal() {
           <button
             type="button"
             onClick={() => void sipEngine.decline()}
-            className="w-14 h-14 rounded-full bg-danger hover:bg-danger flex items-center justify-center text-white transition"
+            className="w-14 h-14 rounded-full bg-danger hover:bg-danger flex items-center justify-center text-inverse transition"
             title="Decline"
           >
             <PhoneOff className="w-6 h-6" />
@@ -39,7 +39,7 @@ export function IncomingCallModal() {
           <button
             type="button"
             onClick={() => void sipEngine.answer()}
-            className="w-14 h-14 rounded-full bg-success hover:bg-success flex items-center justify-center text-white transition"
+            className="w-14 h-14 rounded-full bg-success hover:bg-success flex items-center justify-center text-inverse transition"
             title="Answer"
           >
             <Check className="w-6 h-6" />
