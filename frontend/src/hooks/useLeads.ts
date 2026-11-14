@@ -83,6 +83,34 @@ export function useUpdateLead() {
   });
 }
 
+/**
+ * Bulk insert, for CSV imports.
+ *
+ * Inserting a five-hundred-row import one row at a time is five hundred round
+ * trips and five hundred cache invalidations, each of which refetches the whole
+ * list — so the import gets slower as it goes and the grid re-renders throughout.
+ * One statement with one invalidation is both faster and calmer to watch.
+ */
+export function useCreateLeads() {
+  const queryClient = useQueryClient();
+  return useMutation<Lead[], Error, Array<Omit<Lead, "id" | "created_at" | "updated_at" | "call_count">>>({
+    mutationFn: async (leads) => {
+      if (leads.length === 0) return [];
+      if (isApiMode) {
+        const created: Lead[] = [];
+        for (const lead of leads) created.push(await api.leads.create(lead));
+        return created;
+      }
+      const { data, error } = await supabase.from("leads").insert(leads).select();
+      if (error) throw error;
+      return (data ?? []) as Lead[];
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+    },
+  });
+}
+
 export function useDeleteLead() {
   const queryClient = useQueryClient();
   return useMutation<void, Error, string>({

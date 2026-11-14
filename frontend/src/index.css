@@ -195,4 +195,64 @@ html[data-density="compact"] {
     @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5
            text-xs font-semibold whitespace-nowrap;
   }
+
+  /* A hotkey hint shown next to the control it triggers, so the shortcut is
+     discoverable at the moment it is useful rather than in a help page. */
+  .kbd {
+    @apply inline-flex items-center justify-center rounded border border-line-strong
+           bg-inset font-mono text-[10px] font-semibold leading-none text-faint;
+    min-width: 1.3rem;
+    height: 1.3rem;
+    padding: 0 0.3rem;
+  }
+
+  /* One column of a multi-pane workspace. Each pane scrolls independently and
+     keeps its own header pinned, which is what makes a dense screen readable. */
+  .pane {
+    @apply flex min-h-0 flex-col bg-panel;
+  }
+  .pane-head {
+    @apply flex shrink-0 items-center justify-between gap-2 border-b border-line px-3 py-2;
+  }
+  .pane-title {
+    @apply text-[11px] font-semibold uppercase tracking-wider text-faint;
+  }
+  .pane-body {
+    @apply min-h-0 flex-1 overflow-y-auto;
+  }
+
+  /* Loading placeholder that moves, so a slow query reads as "working" instead
+     of "broken". */
+  .skeleton {
+    @apply animate-shimmer rounded bg-hover;
+    background-image: linear-gradient(
+      90deg,
+      rgb(var(--c-hover)) 0%,
+      rgb(var(--c-raised)) 45%,
+      rgb(var(--c-hover)) 90%
+    );
+    background-size: 200% 100%;
+  }
+
+  /* The selected row in a queue or grid: accent edge plus a tint, so selection
+     survives a theme change and does not rely on colour alone. */
+  .row-selected {
+    @apply bg-accent/12 shadow-[inset_2px_0_0_0_rgb(var(--c-accent))];
+  }
+}
+
+/*
+ * An agent working a queue all day should not be animated at. Every transition
+ * and animation in the app collapses when the OS asks for reduced motion; this
+ * is a blanket rule rather than per-component opt-outs so nothing can forget it.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

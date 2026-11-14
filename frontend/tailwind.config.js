@@ -113,6 +113,46 @@ export default {
         raised: "var(--shadow-raised)",
         floating: "var(--shadow-floating)",
       },
+      /*
+       * Motion is part of the system rather than a per-component choice, so the
+       * easing and durations are declared once. Everything here is short: the
+       * app is a dialer, and an agent working a queue should never wait on an
+       * animation. `prefers-reduced-motion` collapses all of it (index.css).
+       */
+      keyframes: {
+        "fade-in": {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
+        },
+        "rise-in": {
+          from: { opacity: "0", transform: "translateY(6px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "scale-in": {
+          from: { opacity: "0", transform: "scale(0.97)" },
+          to: { opacity: "1", transform: "scale(1)" },
+        },
+        // A ringing call has to be noticeable without being alarming.
+        "ring-pulse": {
+          "0%": { boxShadow: "0 0 0 0 rgb(var(--c-success) / 0.5)" },
+          "70%": { boxShadow: "0 0 0 8px rgb(var(--c-success) / 0)" },
+          "100%": { boxShadow: "0 0 0 0 rgb(var(--c-success) / 0)" },
+        },
+        shimmer: {
+          from: { backgroundPosition: "200% 0" },
+          to: { backgroundPosition: "-200% 0" },
+        },
+      },
+      animation: {
+        "fade-in": "fade-in 140ms ease-out both",
+        "rise-in": "rise-in 200ms cubic-bezier(0.22, 1, 0.36, 1) both",
+        "scale-in": "scale-in 150ms cubic-bezier(0.22, 1, 0.36, 1) both",
+        "ring-pulse": "ring-pulse 1.8s ease-out infinite",
+        shimmer: "shimmer 1.6s linear infinite",
+      },
+      transitionTimingFunction: {
+        spring: "cubic-bezier(0.22, 1, 0.36, 1)",
+      },
     },
   },
   plugins: [],

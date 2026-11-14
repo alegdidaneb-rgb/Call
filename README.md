@@ -42,25 +42,58 @@ A free, open-source browser-based cold calling dialer with SIP support. No insta
 
 ## Features
 
-- **Browser Softphone** — SIP.js integration, no desktop app needed
-- **Command palette** — `Cmd/Ctrl+K` to search leads, jump to any page, or
-  change theme and density
-- **Dark and light themes** with a density control, all persisted per browser
-  and driven by a design-token layer
-- **Multi-Provider SIP** — Works with SignalWire, Telnyx, Twilio, Bitcall, or any SIP server
-- **Lead Management** — CRUD, CSV import, search, filter by status, international
-  addresses (250 countries, dialling codes derived from the country)
-- **Web Softphone** — real SIP/WebRTC calling in the browser: registration, mute,
-  hold, DTMF, inbound calls, and call disposition written back to the lead
-- **Campaign Management** — Create and track outbound calling campaigns
-- **Call Scripts** — Script templates with objection handling responses
-- **Call History** — Log every call with outcome, duration, and notes
-- **Dashboard** — Real-time stats on leads, calls, and conversion rates
-- **Auth** — User accounts with role-based access
-- **Self-Hosted Backend** — SQLite database, no cloud dependencies required
-- **Supabase Support** — Optional cloud database backend
-- **Docker Ready** — One-command deployment
-- **REST API** — Full API for integrations
+### Calling
+
+- **Calling workspace** — the lead queue, the lead being called, and the call
+  controls in three panes on one screen. Dispositioning a lead advances the queue
+  automatically, so working a list never costs a navigation
+- **Keyboard-first** — `j`/`k` move, `d` dials or ends, `m` mutes, `h` holds,
+  `1`–`7` record an outcome, `f` filters, `?` lists every binding
+- **Browser softphone** — real SIP over WebSocket and WebRTC audio: registration,
+  mute, hold, DTMF, inbound calls, one call at a time. No simulation and no
+  fallback; a failure is classified and shown with what to do about it
+- **Multi-provider SIP** — Telnyx, SignalWire, Bitcall (through its gateway), or
+  your own Asterisk/FreeSWITCH/3CX. Each preset states whether a browser can
+  register to it directly, because several cannot
+- **Dispositions that mean something** — each outcome knows the lead status it
+  implies and whether it advances the queue. Statuses never walk backwards, and
+  `do_not_contact` and `converted` are terminal
+
+### Data
+
+- **Lead management** — a sortable, windowed grid with multi-select, shift-click
+  ranges, bulk status change, bulk do-not-contact and bulk delete, plus inline
+  status editing
+- **CSV import and export** — export honours the current filters or selection and
+  quotes to RFC 4180; import writes in one statement rather than one round trip
+  per row
+- **International leads** — 250 countries, with dialling codes derived from the
+  country and the seven genuinely ambiguous shared prefixes refused rather than
+  guessed
+- **Call scripts** — create, edit and delete scripts, attach one to a campaign,
+  and add objection handling. Agents see the resolved script beside the dial button
+- **Call history** — outcome, talk time, notes, and the SIP Call-ID that ties a
+  logged call back to the provider's own record
+
+### Analysis and administration
+
+- **Dashboard** — calls, connect rate, talk time and queue remaining over a window
+  you choose, each compared with the window before it, plus outcome mix, pipeline
+  and per-campaign performance
+- **Campaigns** — create and track outbound calling campaigns
+- **Auth** — accounts created by an administrator only, with role-based access
+  enforced in the client, the API and the database
+- **Command palette** — `Cmd/Ctrl+K` to search leads, jump to any page, or change
+  theme and density
+- **Dark and light themes** with a density control, persisted per browser and
+  driven by a design-token layer
+
+### Deployment
+
+- **Self-hosted backend** — SQLite, no cloud dependencies required
+- **Supabase support** — optional cloud database with row-level security
+- **Docker ready** — one-command deployment
+- **REST API** — full API for integrations
 
 ---
 

@@ -1,150 +1,297 @@
-import React, { useState } from "react";
-import { BookOpen, AlertTriangle, Search } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import toast from "react-hot-toast";
+import { BookOpen, FileText, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { EmptyState } from "@/components/common/EmptyState";
+import { SkeletonCards } from "@/components/common/Skeleton";
+import { ScriptEditor } from "@/components/scripts/ScriptEditor";
+import { useCampaigns } from "@/hooks/useCampaigns";
+import { useDeleteScript, useSaveScript, useScripts, parseObjections } from "@/hooks/useScripts";
+import { chipClass } from "@/lib/outcomes";
 import type { Database } from "@/types/database";
 
 type Script = Database["public"]["Tables"]["call_scripts"]["Row"];
+type ScriptInsert = Database["public"]["Tables"]["call_scripts"]["Insert"];
 
-const SAMPLE_SCRIPT: Script = {
-  id: "sample",
-  title: "Cold Outreach Script — Medical Practices",
-  category: "Medical",
-  content: "Good morning, this is Luke from your company. I'm reaching out because we help specialty practices like yours streamline operations and reduce overhead. Do you have a few minutes to discuss how we can save your practice time and money each month?",
-  objection_responses: {
-    "We're happy with our current billing": {
-      response: "That's great to hear. Many of our clients felt the same way until they saw our average 30% reduction in denied claims. Could I show you a quick comparison?",
-      category: "satisfaction",
-    },
-    "I don't have time right now": {
-      response: "I completely understand. This is a 15-minute conversation that could save hours each week. When would be a better time — tomorrow or later this week?",
-      category: "time",
-    },
-    "Send me an email instead": {
-      response: "I'd love to send over our case study, but a quick call is much faster. I can show you real numbers from practices just like yours. Would 10 minutes tomorrow work?",
-      category: "deferral",
-    },
-    "We just changed billing companies": {
-      response: "That's great! When they're ready, or if the new vendor doesn't meet expectations, I'd love to have a conversation. Mind if I follow up in 3 months?",
-      category: "timing",
-    },
-  },
-  campaign_id: null,
-  created_by: null,
-  is_active: true,
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
-};
+/**
+ * Call scripts.
+ *
+ * This page used to render one script that was hardcoded in the file itself, held
+ * in `useState`, with a search box that filtered a list of one and a close button
+ * drawn as a magnifying glass. Nothing on it could be created or changed, and the
+ * `call_scripts` table it was named after was never queried.
+ *
+ * It reads and writes the table now. That is not cosmetic: the workspace shows an
+ * agent the script for the lead they are calling, so until this page could write
+ * one, every agent was reading either nothing or text no manager had approved.
+ */
 
 export function ScriptsPage() {
-  const [scripts] = useState<Script[]>([SAMPLE_SCRIPT]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedScript, setSelectedScript] = useState<Script | null>(null);
-  const [activeObjection, setActiveObjection] = useState<string | null>(null);
+  const scriptsQuery = useScripts();
+  const campaignsQuery = useCampaigns();
+  const saveScript = useSaveScript();
+  const deleteScript = useDeleteScript();
 
-  const filtered = scripts.filter(
-    (s) =>
-      s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.category.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const [search, setSearch] = useState("");
+  const [editing, setEditing] = useState<Script | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Script | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
-  const objections = selectedScript
-    ? Object.entries(selectedScript.objection_responses ?? {})
-    : [];
+  const scripts = useMemo(() => scriptsQuery.data ?? [], [scriptsQuery.data]);
+  const campaigns = useMemo(() => campaignsQuery.data ?? [], [campaignsQuery.data]);
+
+  const campaignName = (id: string | null) =>
+    id ? (campaigns.find((campaign) => campaign.id === id)?.name ?? "unknown campaign") : null;
+
+  const filtered = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return scripts;
+    return scripts.filter((script) =>
+      [script.title, script.category, script.content, campaignName(script.campaign_id)]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(query),
+    );
+    // campaignName is a stable derivation over `campaigns`, so it does not need
+    // to be a dependency of its own.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scripts, search, campaigns]);
+
+  async function handleSave(payload: ScriptInsert, id: string | null) {
+    try {
+      await saveScript.mutateAsync({ id, payload });
+      toast.success(id ? "Script updated" : "Script created");
+      setCreating(false);
+      setEditing(null);
+    } catch (error) {
+      // Rethrown so the editor stays open with its contents; the toast is the
+      // visible half of the failure.
+      toast.error(error instanceof Error ? error.message : "Could not save the script");
+      throw error;
+    }
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    try {
+      await deleteScript.mutateAsync(deleteTarget.id);
+      toast.success("Script deleted");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not delete the script");
+    } finally {
+      setDeleteTarget(null);
+    }
+  }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-ink">Call Scripts</h1>
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-faint w-4 h-4" />
-        <input
-          type="text"
-          placeholder="Search scripts..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 border border-line-strong rounded-lg text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none"
-        />
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtered.map((script) => (
-          <button
-            key={script.id}
-            onClick={() => {
-              setSelectedScript(script);
-              setActiveObjection(null);
-            }}
-            className="text-left bg-panel rounded-xl p-5 border border-line hover:border-accent/40 hover:shadow-md transition"
-          >
-            <div className="flex items-center gap-2 mb-2">
-              <BookOpen className="w-5 h-5 text-accent" />
-              <h3 className="font-semibold text-ink">{script.title}</h3>
-            </div>
-            <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-accent/12 text-accent">
-              {script.category}
-            </span>
-            {script.is_active && (
-              <span className="ml-2 inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-success/12 text-success">
-                Active
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {selectedScript && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-panel rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-5 border-b border-line">
-              <div className="flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-accent" />
-                <h2 className="text-lg font-semibold text-ink">{selectedScript.title}</h2>
-              </div>
-              <button
-                onClick={() => setSelectedScript(null)}
-                className="text-faint hover:text-muted"
-              >
-                <Search className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-5 space-y-5">
-              <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-accent/12 text-accent">
-                {selectedScript.category}
-              </span>
-              <div className="bg-app rounded-lg p-4">
-                <p className="text-ink leading-relaxed whitespace-pre-wrap">
-                  {selectedScript.content}
-                </p>
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-ink mb-3 flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-warning" />
-                  Common Objections & Responses
-                </h3>
-                <div className="space-y-2">
-                  {objections.map(([objection, data]: [string, any]) => (
-                    <div key={objection}>
-                      <button
-                        onClick={() =>
-                          setActiveObjection(
-                            activeObjection === objection ? null : objection
-                          )
-                        }
-                        className="w-full text-left p-3 rounded-lg border border-line hover:border-accent/40 hover:bg-accent/12 transition text-sm"
-                      >
-                        <span className="font-medium text-ink">"{objection}"</span>
-                        <span className="text-xs text-faint ml-2">{data.category}</span>
-                      </button>
-                      {activeObjection === objection && (
-                        <div className="mt-2 p-3 bg-accent/12 rounded-lg border border-accent/40 text-sm text-accent">
-                          {data.response}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
+    <div className="mx-auto max-w-6xl space-y-4">
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-ink">Call scripts</h1>
+          <p className="mt-1 text-sm text-muted">
+            {scripts.length === 0
+              ? "No scripts yet — an agent calling from the workspace will see nothing to read"
+              : `${scripts.length} script${scripts.length === 1 ? "" : "s"} · shown to agents in the workspace while they call`}
+          </p>
         </div>
+        <button type="button" onClick={() => setCreating(true)} className="btn btn-primary btn-sm">
+          <Plus className="h-3.5 w-3.5" />
+          New script
+        </button>
+      </header>
+
+      {scripts.length > 0 ? (
+        <div className="relative max-w-sm">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-faint" />
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search scripts"
+            aria-label="Search scripts"
+            className="input !pl-8"
+          />
+        </div>
+      ) : null}
+
+      {scriptsQuery.isLoading ? (
+        <SkeletonCards cards={3} className="md:grid-cols-2 lg:grid-cols-3" />
+      ) : scriptsQuery.isError ? (
+        <div className="card">
+          <EmptyState
+            tone="danger"
+            icon={FileText}
+            title="Could not load scripts"
+            description={
+              scriptsQuery.error instanceof Error ? scriptsQuery.error.message : "The request failed."
+            }
+            action={
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => void scriptsQuery.refetch()}>
+                Try again
+              </button>
+            }
+          />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="card">
+          {search ? (
+            <EmptyState
+              icon={Search}
+              title="No script matches"
+              description={`Nothing matches "${search}".`}
+              action={
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setSearch("")}>
+                  Clear search
+                </button>
+              }
+            />
+          ) : (
+            <EmptyState
+              icon={BookOpen}
+              title="No scripts yet"
+              description="Write the words an agent should say. Attach it to a campaign and every lead in that campaign gets it beside the dial button; leave it general and it is the fallback."
+              action={
+                <button type="button" className="btn btn-primary btn-sm" onClick={() => setCreating(true)}>
+                  <Plus className="h-3.5 w-3.5" />
+                  Write the first script
+                </button>
+              }
+            />
+          )}
+        </div>
+      ) : (
+        <ul className="grid gap-3 md:grid-cols-2">
+          {filtered.map((script) => {
+            const objections = parseObjections(script.objection_responses);
+            const isOpen = expanded === script.id;
+            const campaign = campaignName(script.campaign_id);
+            return (
+              <li key={script.id} className="card flex flex-col overflow-hidden animate-rise-in">
+                <div className="flex items-start justify-between gap-2 border-b border-line px-4 py-3">
+                  <div className="min-w-0">
+                    <h2 className="truncate text-sm font-semibold text-ink">{script.title}</h2>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                      <span className={`chip !text-[10px] ${chipClass("accent")}`}>{script.category}</span>
+                      <span
+                        className={`chip !text-[10px] ${chipClass(script.is_active ? "success" : "neutral")}`}
+                      >
+                        {script.is_active ? "Active" : "Inactive"}
+                      </span>
+                      {campaign ? (
+                        <span className={`chip !text-[10px] ${chipClass("info")}`}>{campaign}</span>
+                      ) : (
+                        <span className={`chip !text-[10px] ${chipClass("neutral")}`}>General</span>
+                      )}
+                      {objections.length > 0 ? (
+                        <span className={`chip !text-[10px] ${chipClass("warning")}`}>
+                          {objections.length} objection{objections.length === 1 ? "" : "s"}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setEditing(script)}
+                      aria-label={`Edit ${script.title}`}
+                      title="Edit"
+                      className="rounded p-1.5 text-faint transition-colors hover:bg-hover hover:text-accent"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTarget(script)}
+                      aria-label={`Delete ${script.title}`}
+                      title="Delete"
+                      className="rounded p-1.5 text-faint transition-colors hover:bg-danger/12 hover:text-danger"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="min-w-0 flex-1 px-4 py-3">
+                  <p
+                    className={`whitespace-pre-wrap text-[13px] leading-relaxed text-muted ${
+                      isOpen ? "" : "line-clamp-3"
+                    }`}
+                  >
+                    {script.content}
+                  </p>
+
+                  {isOpen && objections.length > 0 ? (
+                    <ul className="mt-3 space-y-1.5 border-t border-line pt-3">
+                      {objections.map((entry) => (
+                        <li key={entry.objection} className="rounded-lg bg-inset px-2.5 py-2">
+                          <p className="text-[12px] font-semibold text-ink">“{entry.objection}”</p>
+                          <p className="mt-1 text-[12px] leading-relaxed text-muted">{entry.response}</p>
+                          {entry.category ? (
+                            <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-faint">
+                              {entry.category}
+                            </p>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+
+                <div className="flex items-center justify-between gap-2 border-t border-line px-4 py-2">
+                  <span className="text-[11px] text-faint">
+                    Updated {new Date(script.updated_at ?? script.created_at).toLocaleDateString()}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setExpanded(isOpen ? null : script.id)}
+                    className="btn btn-ghost btn-sm"
+                    aria-expanded={isOpen}
+                  >
+                    {isOpen ? "Collapse" : "Read"}
+                  </button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
       )}
+
+      <p className="flex items-center gap-1.5 text-[11px] text-faint">
+        <FileText className="h-3 w-3" />
+        Scripts appear beside the dial button in the{" "}
+        <Link to="/workspace" className="font-semibold text-accent underline underline-offset-2">
+          workspace
+        </Link>
+        , resolved against each lead's campaign.
+      </p>
+
+      {creating || editing ? (
+        <ScriptEditor
+          script={editing}
+          campaigns={campaigns}
+          onClose={() => {
+            setCreating(false);
+            setEditing(null);
+          }}
+          onSave={handleSave}
+        />
+      ) : null}
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete script"
+        message={`Delete "${deleteTarget?.title}"? Agents calling leads in ${
+          campaignName(deleteTarget?.campaign_id ?? null) ?? "any campaign"
+        } will no longer see it.`}
+        variant="danger"
+        confirmLabel="Delete script"
+        onConfirm={() => void handleDelete()}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

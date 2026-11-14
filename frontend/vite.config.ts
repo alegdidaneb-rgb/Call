@@ -12,6 +12,14 @@ export default defineConfig({
   server: {
     port: 3000,
     host: true,
+    /*
+     * The app is reviewed through a proxy on a host that is not localhost, and
+     * Vite rejects an unlisted Host header outright. `true` accepts any host,
+     * which is appropriate for a dev server that binds on purpose and carries no
+     * secrets of its own -- the Supabase key here is the same public client key
+     * that ships in the production bundle.
+     */
+    allowedHosts: true,
   },
   build: {
     outDir: "dist",
