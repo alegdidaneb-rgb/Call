@@ -5,30 +5,30 @@ interface StatusBadgeProps {
 }
 
 const statusColors: Record<string, string> = {
-  new: "bg-brand-100 text-brand-800",
-  contacted: "bg-blue-100 text-blue-800",
-  interested: "bg-amber-100 text-amber-800",
-  not_interested: "bg-gray-100 text-gray-800",
-  callback: "bg-purple-100 text-purple-800",
-  converted: "bg-green-100 text-green-800",
-  do_not_contact: "bg-red-100 text-red-800",
-  active: "bg-green-100 text-green-800",
-  paused: "bg-yellow-100 text-yellow-800",
-  scheduled: "bg-brand-100 text-brand-800",
-  completed: "bg-green-100 text-green-800",
-  cancelled: "bg-red-100 text-red-800",
-  rescheduled: "bg-yellow-100 text-yellow-800",
-  answered: "bg-green-100 text-green-800",
-  no_answer: "bg-gray-100 text-gray-800",
-  busy: "bg-red-100 text-red-800",
-  voicemail: "bg-yellow-100 text-yellow-800",
-  dnc: "bg-red-100 text-red-800",
-  wrong_number: "bg-gray-100 text-gray-800",
-  disconnected: "bg-gray-100 text-gray-800",
+  new: "bg-accent/12 text-accent",
+  contacted: "bg-info/12 text-info",
+  interested: "bg-warning/12 text-warning",
+  not_interested: "bg-hover text-ink",
+  callback: "bg-alt/12 text-alt",
+  converted: "bg-success/12 text-success",
+  do_not_contact: "bg-danger/12 text-danger",
+  active: "bg-success/12 text-success",
+  paused: "bg-warning/12 text-warning",
+  scheduled: "bg-accent/12 text-accent",
+  completed: "bg-success/12 text-success",
+  cancelled: "bg-danger/12 text-danger",
+  rescheduled: "bg-warning/12 text-warning",
+  answered: "bg-success/12 text-success",
+  no_answer: "bg-hover text-ink",
+  busy: "bg-danger/12 text-danger",
+  voicemail: "bg-warning/12 text-warning",
+  dnc: "bg-danger/12 text-danger",
+  wrong_number: "bg-hover text-ink",
+  disconnected: "bg-hover text-ink",
 };
 
 export function StatusBadge({ status }: StatusBadgeProps) {
-  const colorClass = statusColors[status] ?? "bg-gray-100 text-gray-800";
+  const colorClass = statusColors[status] ?? "bg-hover text-ink";
   return (
     <span
       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${colorClass}`}

@@ -83,21 +83,21 @@ export function CsvImport({ onClose, onImport }: CsvImportProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-5 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Import CSV</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+      <div className="bg-panel rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-5 border-b border-line">
+          <h2 className="text-lg font-semibold text-ink">Import CSV</h2>
+          <button onClick={onClose} className="text-faint hover:text-muted">
             <X className="w-5 h-5" />
           </button>
         </div>
         <div className="p-5 space-y-4">
           {!parsedData.length ? (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Select CSV File</label>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-brand-400 transition cursor-pointer">
-                <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                <p className="text-sm text-gray-600">Click to select or drag and drop a CSV file</p>
-                <p className="text-xs text-gray-400 mt-1">Supports quoted fields, commas, and multi-line cells</p>
+              <label className="block text-sm font-medium text-ink mb-2">Select CSV File</label>
+              <div className="border-2 border-dashed border-line-strong rounded-lg p-8 text-center hover:border-accent/40 transition cursor-pointer">
+                <Upload className="w-8 h-8 text-faint mx-auto mb-2" />
+                <p className="text-sm text-muted">Click to select or drag and drop a CSV file</p>
+                <p className="text-xs text-faint mt-1">Supports quoted fields, commas, and multi-line cells</p>
                 <input
                   type="file"
                   accept=".csv,.tsv,.txt"
@@ -107,26 +107,26 @@ export function CsvImport({ onClose, onImport }: CsvImportProps) {
                 />
                 <label
                   htmlFor="csv-upload"
-                  className="mt-3 inline-block px-4 py-2 text-sm font-medium text-brand-600 bg-brand-50 rounded-lg hover:bg-brand-100 cursor-pointer transition"
+                  className="mt-3 inline-block px-4 py-2 text-sm font-medium text-accent bg-accent/12 rounded-lg hover:bg-accent/12 cursor-pointer transition"
                 >
                   Choose File
                 </label>
               </div>
-              {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
+              {error && <p className="text-sm text-danger mt-2">{error}</p>}
             </div>
           ) : (
             <div className="space-y-4">
-              <p className="text-sm text-gray-600">{parsedData.length} rows parsed. Map CSV columns to database fields.</p>
+              <p className="text-sm text-muted">{parsedData.length} rows parsed. Map CSV columns to database fields.</p>
               <div className="space-y-2">
                 {csvColumns.map((col) => {
                   const csvOptions = ["— None —", ...headers];
                   return (
                     <div key={col} className="flex items-center gap-3">
-                      <span className="w-32 text-sm font-medium text-gray-700 capitalize">{col.replace(/_/g, " ")}</span>
+                      <span className="w-32 text-sm font-medium text-ink capitalize">{col.replace(/_/g, " ")}</span>
                       <select
                         value={mapping[col] ?? ""}
                         onChange={(e) => setMapping((prev) => ({ ...prev, [col]: e.target.value || undefined }))}
-                        className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none bg-white"
+                        className="flex-1 px-3 py-1.5 border border-line-strong rounded-lg text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none bg-panel"
                       >
                         {csvOptions.map((opt) => (
                           <option key={opt} value={opt === "— None —" ? "" : opt}>{opt}</option>
@@ -136,21 +136,21 @@ export function CsvImport({ onClose, onImport }: CsvImportProps) {
                   );
                 })}
               </div>
-              <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg">
+              <div className="max-h-40 overflow-y-auto border border-line rounded-lg">
                 <table className="w-full text-xs">
-                  <thead className="bg-gray-50 sticky top-0">
+                  <thead className="bg-app sticky top-0">
                     <tr>
                       {headers.slice(0, 5).map((h) => (
-                        <th key={h} className="px-3 py-2 text-left font-medium text-gray-600">{h}</th>
+                        <th key={h} className="px-3 py-2 text-left font-medium text-muted">{h}</th>
                       ))}
-                      {headers.length > 5 && <th className="px-3 py-2 text-left font-medium text-gray-600">...</th>}
+                      {headers.length > 5 && <th className="px-3 py-2 text-left font-medium text-muted">...</th>}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-line">
                     {parsedData.slice(0, 3).map((row, i) => (
                       <tr key={i}>
                         {headers.slice(0, 5).map((h, j) => (
-                          <td key={j} className="px-3 py-1.5 text-gray-600 truncate max-w-[120px]">{row[h] ?? "—"}</td>
+                          <td key={j} className="px-3 py-1.5 text-muted truncate max-w-[120px]">{row[h] ?? "—"}</td>
                         ))}
                       </tr>
                     ))}
@@ -158,10 +158,10 @@ export function CsvImport({ onClose, onImport }: CsvImportProps) {
                 </table>
               </div>
               <div className="flex justify-between">
-                <button type="button" onClick={() => { setParsedData([]); setMapping({}); }} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition">Change File</button>
+                <button type="button" onClick={() => { setParsedData([]); setMapping({}); }} className="px-4 py-2 text-sm font-medium text-ink bg-hover hover:bg-line rounded-lg transition">Change File</button>
                 <div className="flex gap-3">
-                  <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition">Cancel</button>
-                  <button type="button" onClick={handleImport} disabled={loading} className="px-4 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 disabled:bg-brand-400 rounded-lg transition">
+                  <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-ink bg-hover hover:bg-line rounded-lg transition">Cancel</button>
+                  <button type="button" onClick={handleImport} disabled={loading} className="px-4 py-2 text-sm font-medium text-white bg-accent hover:bg-accent-strong disabled:bg-accent rounded-lg transition">
                     {loading ? "Importing..." : "Import"}
                   </button>
                 </div>

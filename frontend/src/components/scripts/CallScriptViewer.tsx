@@ -46,26 +46,26 @@ export function CallScriptViewer({ onClose }: CallScriptViewerProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-5 border-b border-gray-200">
+      <div className="bg-panel rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-5 border-b border-line">
           <div className="flex items-center gap-2">
-            <BookOpen className="w-5 h-5 text-brand-600" />
-            <h2 className="text-lg font-semibold text-gray-900">{script.title}</h2>
+            <BookOpen className="w-5 h-5 text-accent" />
+            <h2 className="text-lg font-semibold text-ink">{script.title}</h2>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className="text-faint hover:text-muted">
             <X className="w-5 h-5" />
           </button>
         </div>
         <div className="p-5 space-y-5">
-          <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-100 text-brand-800">
+          <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-accent/12 text-accent">
             {script.category}
           </span>
-          <div className="bg-gray-50 rounded-lg p-4">
-            <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">{script.content}</p>
+          <div className="bg-app rounded-lg p-4">
+            <p className="text-ink leading-relaxed whitespace-pre-wrap">{script.content}</p>
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-500" />
+            <h3 className="text-sm font-semibold text-ink mb-3 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-warning" />
               Common Objections & Responses
             </h3>
             <div className="space-y-2">
@@ -73,13 +73,13 @@ export function CallScriptViewer({ onClose }: CallScriptViewerProps) {
                 <div key={objection}>
                   <button
                     onClick={() => setActiveObjection(activeObjection === objection ? null : objection)}
-                    className="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-brand-300 hover:bg-brand-50 transition text-sm"
+                    className="w-full text-left p-3 rounded-lg border border-line hover:border-accent/40 hover:bg-accent/12 transition text-sm"
                   >
-                    <span className="font-medium text-gray-900">"{objection}"</span>
-                    <span className="text-xs text-gray-400 ml-2">{data.category}</span>
+                    <span className="font-medium text-ink">"{objection}"</span>
+                    <span className="text-xs text-faint ml-2">{data.category}</span>
                   </button>
                   {activeObjection === objection && (
-                    <div className="mt-2 p-3 bg-brand-50 rounded-lg border border-brand-200 text-sm text-brand-900">
+                    <div className="mt-2 p-3 bg-accent/12 rounded-lg border border-accent/40 text-sm text-accent">
                       {data.response}
                     </div>
                   )}

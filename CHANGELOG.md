@@ -8,6 +8,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- A design-token layer in `src/index.css`: every colour is an RGB triplet on a
+  CSS variable, so one token serves as a solid fill, a tinted chip background
+  and a hairline border through Tailwind's opacity modifiers
+- Dark and light themes, both complete, plus a "match system" mode that follows
+  the OS live. The choice is applied by an inline script in `index.html` before
+  first paint, so a returning agent never sees the wrong theme flash
+- A density control. It scales the root font size, which scales every
+  rem-based spacing and text value, so it applies across the whole app rather
+  than only to surfaces that opt in
+- A command palette on `Cmd/Ctrl+K` or `/`: jump to any page, find a lead by
+  name, company, phone or email, and change theme or density without leaving
+  the keyboard
+- Live SIP registration status in the top bar, which opens the Phone page for
+  administrators
+- `vite.config.ts` now splits React into its own chunk, so a UI change no longer
+  invalidates ~165 kB in every agent's cache
+
+### Changed
+- Navigation is grouped into Work, Manage and Admin instead of one flat list of
+  eight entries
+- The accent is an indigo-violet rather than the framework's stock blue, and the
+  default Tailwind palette is now removed from the config entirely so off-token
+  colours cannot creep back in one utility at a time
+- Inter is actually loaded; it was declared in the theme but never fetched, so
+  every surface was rendering in the system fallback
+- JetBrains Mono for phone numbers, timers and other digits, with tabular
+  figures so they do not jitter as they change
+- The stock Vite favicon is replaced with an application mark
+
+### Removed
+- The header search input, which rendered and accepted typing but was never
+  connected to anything, and the notification bell, which carried a hardcoded
+  unread dot for a notification system that does not exist. Both are superseded
+  by the command palette
 - A working browser softphone: SIP registration over WSS, WebRTC audio, mute,
   hold, DTMF, inbound call handling, and one call at a time
 - `sip_accounts` in both the Supabase and SQLite schemas, with row-level security

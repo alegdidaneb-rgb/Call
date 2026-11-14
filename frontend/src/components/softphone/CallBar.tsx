@@ -42,14 +42,14 @@ export function CallBar() {
 
   return (
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[min(94vw,32rem)]">
-      <div className="bg-gray-900 text-white rounded-xl shadow-2xl px-4 py-3 flex items-center gap-3">
+      <div className="bg-overlay text-white rounded-xl shadow-2xl px-4 py-3 flex items-center gap-3">
         <span
           className={`w-2.5 h-2.5 rounded-full shrink-0 ${
             snapshot.callState === "active"
-              ? "bg-green-400 animate-pulse"
+              ? "bg-success animate-pulse"
               : snapshot.callState === "held"
-                ? "bg-amber-400"
-                : "bg-white/70 animate-pulse"
+                ? "bg-warning"
+                : "bg-panel/70 animate-pulse"
           }`}
         />
         <div className="flex-1 min-w-0">
@@ -68,7 +68,7 @@ export function CallBar() {
               type="button"
               onClick={() => sipEngine.setMuted(!snapshot.muted)}
               className={`p-2 rounded-lg transition ${
-                snapshot.muted ? "bg-red-500/90 text-white" : "bg-white/10 hover:bg-white/20 text-white"
+                snapshot.muted ? "bg-danger/90 text-white" : "bg-white/10 hover:bg-white/20 text-white"
               }`}
               title={snapshot.muted ? "Unmute" : "Mute"}
             >
@@ -88,7 +88,7 @@ export function CallBar() {
         <button
           type="button"
           onClick={() => void sipEngine.hangup()}
-          className="p-2 rounded-lg bg-red-500 hover:bg-red-600 text-white transition shrink-0"
+          className="p-2 rounded-lg bg-danger hover:bg-danger text-white transition shrink-0"
           title="Hang up"
         >
           <PhoneOff className="w-4 h-4" />

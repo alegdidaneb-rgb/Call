@@ -43,6 +43,10 @@ A free, open-source browser-based cold calling dialer with SIP support. No insta
 ## Features
 
 - **Browser Softphone** — SIP.js integration, no desktop app needed
+- **Command palette** — `Cmd/Ctrl+K` to search leads, jump to any page, or
+  change theme and density
+- **Dark and light themes** with a density control, all persisted per browser
+  and driven by a design-token layer
 - **Multi-Provider SIP** — Works with SignalWire, Telnyx, Twilio, Bitcall, or any SIP server
 - **Lead Management** — CRUD, CSV import, search, filter by status, international
   addresses (250 countries, dialling codes derived from the country)

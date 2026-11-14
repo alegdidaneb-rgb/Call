@@ -247,7 +247,7 @@ export function PhoneSettingsPage() {
     return (
       <div className="space-y-6">
         <PageHeader />
-        <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-800">
+        <div className="rounded-xl border border-danger/30 bg-danger/12 p-5 text-sm text-danger">
           <p className="font-semibold">Could not load the phone settings.</p>
           <p className="mt-1">
             {(accountsQuery.error as Error).message}. If this mentions a missing relation, migration
@@ -264,10 +264,10 @@ export function PhoneSettingsPage() {
       <PageHeader />
 
       {!trunkDefault && accounts.length === 0 && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-5">
+        <div className="rounded-xl border border-warning/30 bg-warning/12 p-5">
           <div className="flex gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-            <div className="text-sm text-amber-900">
+            <AlertTriangle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
+            <div className="text-sm text-warning">
               <p className="font-semibold">No phone is configured yet.</p>
               <p className="mt-1">
                 A browser cannot place a real call on its own — it has to register with a SIP
@@ -281,11 +281,11 @@ export function PhoneSettingsPage() {
         </div>
       )}
 
-      <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
+      <section className="bg-panel rounded-xl border border-line overflow-hidden">
+        <div className="px-5 py-4 border-b border-line flex items-center justify-between">
           <div>
-            <h2 className="text-base font-semibold text-gray-900">SIP accounts</h2>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <h2 className="text-base font-semibold text-ink">SIP accounts</h2>
+            <p className="text-xs text-muted mt-0.5">
               Give each agent their own extension where the provider allows it, so one leaked
               credential cannot be used to dial on the whole trunk.
             </p>
@@ -296,7 +296,7 @@ export function PhoneSettingsPage() {
               setErrors([]);
               setTestResult(null);
             }}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 transition"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent-strong transition"
           >
             <Plus className="w-4 h-4" />
             Add account
@@ -304,28 +304,28 @@ export function PhoneSettingsPage() {
         </div>
 
         {accountsQuery.isLoading ? (
-          <div className="p-8 text-center text-sm text-gray-400">Loading...</div>
+          <div className="p-8 text-center text-sm text-faint">Loading...</div>
         ) : accounts.length === 0 ? (
-          <div className="p-8 text-center text-sm text-gray-400">No accounts yet.</div>
+          <div className="p-8 text-center text-sm text-faint">No accounts yet.</div>
         ) : (
-          <ul className="divide-y divide-gray-100">
+          <ul className="divide-y divide-line">
             {accounts.map((row) => (
               <li key={row.id} className="px-5 py-4 flex items-start gap-4">
-                <div className="w-9 h-9 rounded-full bg-brand-50 flex items-center justify-center shrink-0">
-                  <Phone className="w-4 h-4 text-brand-600" />
+                <div className="w-9 h-9 rounded-full bg-accent/12 flex items-center justify-center shrink-0">
+                  <Phone className="w-4 h-4 text-accent" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
+                  <p className="text-sm font-medium text-ink truncate">
                     {row.label || row.sip_uri}
                     {row.user_id === null && (
-                      <span className="ml-2 inline-flex items-center gap-1 text-[11px] font-normal text-gray-500">
+                      <span className="ml-2 inline-flex items-center gap-1 text-[11px] font-normal text-muted">
                         <Shield className="w-3 h-3" />
                         shared default
                       </span>
                     )}
                   </p>
-                  <p className="text-xs text-gray-500 font-mono truncate">{row.sip_uri}</p>
-                  <p className="text-xs text-gray-400 truncate">
+                  <p className="text-xs text-muted font-mono truncate">{row.sip_uri}</p>
+                  <p className="text-xs text-faint truncate">
                     {SIP_PRESETS[row.provider]?.label ?? row.provider} · {row.ws_url} ·{" "}
                     {profileName(row.user_id)}
                   </p>
@@ -333,7 +333,7 @@ export function PhoneSettingsPage() {
                 <div className="flex items-center gap-1 shrink-0">
                   <span
                     className={`text-[11px] px-2 py-0.5 rounded-full ${
-                      row.enabled ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"
+                      row.enabled ? "bg-success/12 text-success" : "bg-hover text-muted"
                     }`}
                   >
                     {row.enabled ? "Enabled" : "Disabled"}
@@ -344,14 +344,14 @@ export function PhoneSettingsPage() {
                       setErrors([]);
                       setTestResult(null);
                     }}
-                    className="p-2 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition"
+                    className="p-2 rounded-lg text-faint hover:text-accent hover:bg-accent/12 transition"
                     title="Edit"
                   >
                     <RefreshCw className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => setConfirmDelete(row)}
-                    className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
+                    className="p-2 rounded-lg text-faint hover:text-danger hover:bg-danger/12 transition"
                     title="Delete"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -364,9 +364,9 @@ export function PhoneSettingsPage() {
       </section>
 
       {form && (
-        <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-gray-900">
+        <section className="bg-panel rounded-xl border border-line overflow-hidden">
+          <div className="px-5 py-4 border-b border-line flex items-center justify-between">
+            <h2 className="text-base font-semibold text-ink">
               {form.id ? "Edit account" : "New account"}
             </h2>
             <button
@@ -375,7 +375,7 @@ export function PhoneSettingsPage() {
                 setErrors([]);
                 setTestResult(null);
               }}
-              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 transition"
+              className="p-1.5 rounded-lg text-faint hover:text-muted transition"
               title="Close"
             >
               <X className="w-4 h-4" />
@@ -414,7 +414,7 @@ export function PhoneSettingsPage() {
               </Field>
 
               {!SIP_PRESETS[form.provider].browserReady && (
-                <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+                <div className="rounded-md border border-warning/30 bg-warning/12 p-3 text-xs text-warning">
                   <p className="font-semibold">
                     {SIP_PRESETS[form.provider].label} has no SIP-over-WebSocket endpoint
                   </p>
@@ -516,20 +516,20 @@ export function PhoneSettingsPage() {
               />
             </Field>
 
-            <label className="flex items-center gap-2 text-sm text-gray-700">
+            <label className="flex items-center gap-2 text-sm text-ink">
               <input
                 type="checkbox"
                 checked={form.enabled}
                 onChange={(event) => set("enabled", event.target.checked)}
-                className="rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                className="rounded border-line-strong text-accent focus:ring-accent"
               />
               Enabled
             </label>
 
             {errors.length > 0 && (
-              <ul className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 space-y-1">
+              <ul className="rounded-lg border border-danger/30 bg-danger/12 px-3 py-2 space-y-1">
                 {errors.map((message) => (
-                  <li key={message} className="text-xs text-red-800 flex gap-1.5">
+                  <li key={message} className="text-xs text-danger flex gap-1.5">
                     <XCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                     {message}
                   </li>
@@ -541,8 +541,8 @@ export function PhoneSettingsPage() {
               <div
                 className={`rounded-lg border px-3 py-2 text-xs ${
                   testResult.ok
-                    ? "border-green-200 bg-green-50 text-green-800"
-                    : "border-red-200 bg-red-50 text-red-800"
+                    ? "border-success/30 bg-success/12 text-success"
+                    : "border-danger/30 bg-danger/12 text-danger"
                 }`}
               >
                 {testResult.ok ? (
@@ -566,7 +566,7 @@ export function PhoneSettingsPage() {
               <button
                 onClick={handleTest}
                 disabled={testing || !isUsableAccount(formToAccount(form))}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-line-strong text-sm font-medium text-ink hover:bg-app disabled:opacity-50 transition"
               >
                 {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Phone className="w-4 h-4" />}
                 Test connection
@@ -574,12 +574,12 @@ export function PhoneSettingsPage() {
               <button
                 onClick={handleSave}
                 disabled={saveMutation.isPending}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700 disabled:opacity-50 transition"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent text-white text-sm font-semibold hover:bg-accent-strong disabled:opacity-50 transition"
               >
                 {saveMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                 Save
               </button>
-              <span className="text-xs text-gray-400">
+              <span className="text-xs text-faint">
                 Testing registers and then unregisters; it places no call.
               </span>
             </div>
@@ -587,8 +587,8 @@ export function PhoneSettingsPage() {
         </section>
       )}
 
-      <section className="bg-white rounded-xl border border-gray-200 p-5 text-sm text-gray-600 space-y-2">
-        <h2 className="text-base font-semibold text-gray-900">About browser credentials</h2>
+      <section className="bg-panel rounded-xl border border-line p-5 text-sm text-muted space-y-2">
+        <h2 className="text-base font-semibold text-ink">About browser credentials</h2>
         <p>
           A web softphone authenticates to your SIP server from the browser, so the password has to
           be readable by the page. That is inherent to this design, not a defect in it — but it means
@@ -604,16 +604,16 @@ export function PhoneSettingsPage() {
 
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 space-y-4">
-            <h3 className="text-base font-semibold text-gray-900">Remove this account?</h3>
-            <p className="text-sm text-gray-600">
+          <div className="bg-panel rounded-xl shadow-xl max-w-sm w-full p-6 space-y-4">
+            <h3 className="text-base font-semibold text-ink">Remove this account?</h3>
+            <p className="text-sm text-muted">
               {confirmDelete.label || confirmDelete.sip_uri} will no longer be able to register.
               Agents using it will see "Not configured" until another account is added.
             </p>
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setConfirmDelete(null)}
-                className="px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+                className="px-3 py-2 rounded-lg border border-line-strong text-sm font-medium text-ink hover:bg-app transition"
               >
                 Cancel
               </button>
@@ -628,7 +628,7 @@ export function PhoneSettingsPage() {
                   })
                 }
                 disabled={deleteMutation.isPending}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 disabled:opacity-50 transition"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-danger text-white text-sm font-semibold hover:bg-danger/90 disabled:opacity-50 transition"
               >
                 {deleteMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                 Remove
@@ -642,7 +642,7 @@ export function PhoneSettingsPage() {
 }
 
 const inputClass =
-  "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none bg-white";
+  "w-full px-3 py-2 border border-line-strong rounded-lg text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none bg-panel";
 
 function Field({
   label,
@@ -655,9 +655,9 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="block text-xs font-medium text-gray-500 mb-1">{label}</span>
+      <span className="block text-xs font-medium text-muted mb-1">{label}</span>
       {children}
-      {hint && <span className="block text-[11px] text-gray-400 mt-1 font-mono">{hint}</span>}
+      {hint && <span className="block text-[11px] text-faint mt-1 font-mono">{hint}</span>}
     </label>
   );
 }
@@ -665,8 +665,8 @@ function Field({
 function PageHeader() {
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900">Phone</h1>
-      <p className="text-sm text-gray-500 mt-1">
+      <h1 className="text-2xl font-bold text-ink">Phone</h1>
+      <p className="text-sm text-muted mt-1">
         SIP credentials for the browser softphone. Calls are placed over WebRTC through your SIP
         provider.
       </p>

@@ -53,22 +53,22 @@ export function LeadsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Leads</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-ink">Leads</h1>
+          <p className="text-sm text-muted mt-1">
             {filteredLeads.length} of {leads?.length ?? 0} leads
           </p>
         </div>
         <div className="flex gap-2">
           <button
             onClick={() => setShowCsvImport(true)}
-            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-ink bg-panel border border-line-strong rounded-lg hover:bg-app transition"
           >
             <Upload className="w-4 h-4" />
             Import CSV
           </button>
           <button
             onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 transition"
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-accent rounded-lg hover:bg-accent-strong transition"
           >
             <Plus className="w-4 h-4" />
             New Lead
@@ -78,21 +78,21 @@ export function LeadsPage() {
 
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-faint w-4 h-4" />
           <input
             type="text"
             placeholder="Search leads..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
+            className="w-full pl-10 pr-4 py-2 border border-line-strong rounded-lg text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none"
           />
         </div>
         <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-gray-400" />
+          <Filter className="w-4 h-4 text-faint" />
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none bg-white"
+            className="px-3 py-2 border border-line-strong rounded-lg text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none bg-panel"
           >
             <option value="all">All Statuses</option>
             <option value="new">New</option>
@@ -107,34 +107,34 @@ export function LeadsPage() {
       </div>
 
       {filteredLeads.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
-          <p className="text-gray-500">
+        <div className="text-center py-12 bg-panel rounded-xl border border-line">
+          <p className="text-muted">
             {leads?.length === 0 ? "No leads yet" : "No leads match your filters"}
           </p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="bg-panel rounded-xl border border-line overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="bg-app border-b border-line">
                 <tr>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">Name</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">Company</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">Phone</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">Status</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">Last Called</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">Actions</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted">Name</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted">Company</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted">Phone</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted">Status</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted">Last Called</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-line">
                 {filteredLeads.map((lead) => (
-                  <tr key={lead.id} className="hover:bg-gray-50 transition">
-                    <td className="px-4 py-3 font-medium text-gray-900 cursor-pointer hover:text-brand-600" onClick={() => navigate(`/leads/${lead.id}`)}>
+                  <tr key={lead.id} className="hover:bg-app transition">
+                    <td className="px-4 py-3 font-medium text-ink cursor-pointer hover:text-accent" onClick={() => navigate(`/leads/${lead.id}`)}>
                       {lead.first_name} {lead.last_name}
                     </td>
-                    <td className="px-4 py-3 text-gray-600">{lead.company ?? "—"}</td>
+                    <td className="px-4 py-3 text-muted">{lead.company ?? "—"}</td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-1 text-gray-600">
+                      <div className="flex items-center gap-1 text-muted">
                         <Phone className="w-3.5 h-3.5" />
                         {lead.phone ?? "—"}
                       </div>
@@ -154,7 +154,7 @@ export function LeadsPage() {
                         <option value="do_not_contact">DNC</option>
                       </select>
                     </td>
-                    <td className="px-4 py-3 text-gray-500">
+                    <td className="px-4 py-3 text-muted">
                       {lead.last_called_at
                         ? new Date(lead.last_called_at).toLocaleDateString()
                         : "—"}
@@ -163,21 +163,21 @@ export function LeadsPage() {
                       <div className="flex items-center gap-1">
                         <a
                           href={`tel:${lead.phone}`}
-                          className="p-1.5 text-gray-400 hover:text-brand-600 rounded"
+                          className="p-1.5 text-faint hover:text-accent rounded"
                           title="Call"
                         >
                           <Phone className="w-4 h-4" />
                         </a>
                         <a
                           href={`mailto:${lead.email}`}
-                          className="p-1.5 text-gray-400 hover:text-brand-600 rounded"
+                          className="p-1.5 text-faint hover:text-accent rounded"
                           title="Email"
                         >
                           <Mail className="w-4 h-4" />
                         </a>
                         <button
                           onClick={() => setDeleteConfirm({ id: lead.id, name: `${lead.first_name} ${lead.last_name}` })}
-                          className="p-1.5 text-gray-400 hover:text-red-600 rounded"
+                          className="p-1.5 text-faint hover:text-danger rounded"
                           title="Delete"
                         >
                           <MoreHorizontal className="w-4 h-4" />

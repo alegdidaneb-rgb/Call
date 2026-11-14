@@ -23,7 +23,7 @@ const PhoneSettingsPage = React.lazy(() =>
 function PageSpinner() {
   return (
     <div className="flex items-center justify-center h-64">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600"></div>
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
     </div>
   );
 }
@@ -33,7 +33,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
       </div>
     );
   }
@@ -62,17 +62,17 @@ function PendingActivation({ email }: { email: string | null }) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
-        <h1 className="text-lg font-bold text-gray-900">Waiting for an administrator</h1>
-        <p className="text-sm text-gray-600 mt-2">
+    <div className="min-h-screen flex items-center justify-center bg-app px-4">
+      <div className="max-w-md w-full bg-panel rounded-2xl shadow-sm border border-line p-8 text-center">
+        <h1 className="text-lg font-bold text-ink">Waiting for an administrator</h1>
+        <p className="text-sm text-muted mt-2">
           {email ? `The account ${email} ` : "This account "}
           can sign in, but it has not been given access to any data. Accounts are created and
           activated by an administrator from the Team page.
         </p>
         <button
           onClick={handleSignOut}
-          className="mt-6 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+          className="mt-6 px-4 py-2 rounded-lg border border-line-strong text-sm font-medium text-ink hover:bg-app transition"
         >
           Sign out
         </button>

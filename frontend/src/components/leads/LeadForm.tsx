@@ -134,23 +134,23 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
   }
 
   const inputClass =
-    "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none";
+    "w-full px-3 py-2 border border-line-strong rounded-lg text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-5 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">
+      <div className="bg-panel rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-5 border-b border-line">
+          <h2 className="text-lg font-semibold text-ink">
             {initialData?.first_name ? "Edit Lead" : "New Lead"}
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className="text-faint hover:text-muted">
             <X className="w-5 h-5" />
           </button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+              <label className="block text-sm font-medium text-ink mb-1">First Name</label>
               <input
                 type="text"
                 value={formData.first_name}
@@ -161,7 +161,7 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+              <label className="block text-sm font-medium text-ink mb-1">Last Name</label>
               <input
                 type="text"
                 value={formData.last_name}
@@ -174,7 +174,7 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Company</label>
+            <label className="block text-sm font-medium text-ink mb-1">Company</label>
             <input
               type="text"
               value={formData.company}
@@ -184,14 +184,14 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
           </div>
 
           <div>
-            <label htmlFor="lead-country" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="lead-country" className="block text-sm font-medium text-ink mb-1">
               Country
             </label>
             <select
               id="lead-country"
               value={formData.country}
               onChange={(e) => setFormData((prev) => ({ ...prev, country: e.target.value }))}
-              className={`${inputClass} bg-white`}
+              className={`${inputClass} bg-panel`}
             >
               {grouped.map(([region, list]) => (
                 <optgroup key={region} label={region}>
@@ -204,7 +204,7 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
                 </optgroup>
               ))}
             </select>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-muted mt-1">
               {COUNTRIES.length} countries. Sets the dialling code below and is stored as an ISO
               3166-1 code.
             </p>
@@ -212,12 +212,12 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+              <label className="block text-sm font-medium text-ink mb-1">Phone</label>
               <div className="flex">
                 {/* Derived from the country, not independently editable: two
                     controls for one fact would eventually disagree. */}
                 <span
-                  className="inline-flex items-center px-2.5 py-2 border border-r-0 border-gray-300 rounded-l-lg text-sm bg-gray-50 text-gray-600 min-w-[3.5rem] justify-center"
+                  className="inline-flex items-center px-2.5 py-2 border border-r-0 border-line-strong rounded-l-lg text-sm bg-app text-muted min-w-[3.5rem] justify-center"
                   title={`Dialling code for ${formData.country}`}
                 >
                   {dial || "—"}
@@ -227,12 +227,12 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
                   value={formData.phone}
                   onChange={(e) => setFormData((prev) => ({ ...prev, phone: e.target.value }))}
                   placeholder={dial === "+1" ? "(862) 366-7732" : "local number"}
-                  className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-r-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
+                  className="flex-1 min-w-0 px-3 py-2 border border-line-strong rounded-r-lg text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none"
                 />
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <label className="block text-sm font-medium text-ink mb-1">Email</label>
               <input
                 type="email"
                 value={formData.email}
@@ -243,7 +243,7 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
+            <label className="block text-sm font-medium text-ink mb-1">Website</label>
             <input
               type="url"
               value={formData.website}
@@ -253,7 +253,7 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+            <label className="block text-sm font-medium text-ink mb-1">Address</label>
             <input
               type="text"
               value={formData.address}
@@ -264,7 +264,7 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
 
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+              <label className="block text-sm font-medium text-ink mb-1">City</label>
               <input
                 type="text"
                 value={formData.city}
@@ -274,7 +274,7 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
             </div>
             <div>
               {/* Not every country has states, and not every state is called one. */}
-              <label className="block text-sm font-medium text-gray-700 mb-1">State / Region</label>
+              <label className="block text-sm font-medium text-ink mb-1">State / Region</label>
               <input
                 type="text"
                 value={formData.state}
@@ -283,7 +283,7 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Postal code</label>
+              <label className="block text-sm font-medium text-ink mb-1">Postal code</label>
               <input
                 type="text"
                 value={formData.zip}
@@ -295,7 +295,7 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Source</label>
+              <label className="block text-sm font-medium text-ink mb-1">Source</label>
               <input
                 type="text"
                 value={formData.source}
@@ -305,11 +305,11 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+              <label className="block text-sm font-medium text-ink mb-1">Status</label>
               <select
                 value={formData.status}
                 onChange={(e) => setFormData((prev) => ({ ...prev, status: e.target.value }))}
-                className={`${inputClass} bg-white`}
+                className={`${inputClass} bg-panel`}
               >
                 <option value="new">New</option>
                 <option value="contacted">Contacted</option>
@@ -326,13 +326,13 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+              className="px-4 py-2 text-sm font-medium text-ink bg-hover hover:bg-line rounded-lg transition"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition"
+              className="px-4 py-2 text-sm font-medium text-white bg-accent hover:bg-accent-strong rounded-lg transition"
             >
               Save Lead
             </button>

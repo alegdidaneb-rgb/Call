@@ -18,20 +18,20 @@ export function IncomingCallModal() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 text-center space-y-4">
-        <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto animate-pulse">
-          <PhoneIncoming className="w-8 h-8 text-green-600" />
+      <div className="bg-panel rounded-xl shadow-xl max-w-sm w-full p-6 text-center space-y-4">
+        <div className="w-16 h-16 rounded-full bg-success/12 flex items-center justify-center mx-auto animate-pulse">
+          <PhoneIncoming className="w-8 h-8 text-success" />
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">Incoming call</h3>
-          <p className="text-sm text-gray-600">{snapshot.remoteName || "Unknown"}</p>
-          <p className="text-sm font-mono text-gray-500">{snapshot.remoteNumber}</p>
+          <h3 className="text-lg font-semibold text-ink">Incoming call</h3>
+          <p className="text-sm text-muted">{snapshot.remoteName || "Unknown"}</p>
+          <p className="text-sm font-mono text-muted">{snapshot.remoteNumber}</p>
         </div>
         <div className="flex items-center justify-center gap-6">
           <button
             type="button"
             onClick={() => void sipEngine.decline()}
-            className="w-14 h-14 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center text-white transition"
+            className="w-14 h-14 rounded-full bg-danger hover:bg-danger flex items-center justify-center text-white transition"
             title="Decline"
           >
             <PhoneOff className="w-6 h-6" />
@@ -39,7 +39,7 @@ export function IncomingCallModal() {
           <button
             type="button"
             onClick={() => void sipEngine.answer()}
-            className="w-14 h-14 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center text-white transition"
+            className="w-14 h-14 rounded-full bg-success hover:bg-success flex items-center justify-center text-white transition"
             title="Answer"
           >
             <Check className="w-6 h-6" />

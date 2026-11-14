@@ -16,5 +16,17 @@ export default defineConfig({
   build: {
     outDir: "dist",
     sourcemap: false,
+    rollupOptions: {
+      output: {
+        /*
+         * Keep the framework in its own bundle. Application code changes on
+         * most commits; React does not, so splitting it means a UI change no
+         * longer invalidates ~180 kB in every agent's cache.
+         */
+        manualChunks: {
+          react: ["react", "react-dom", "react-router-dom", "scheduler"],
+        },
+      },
+    },
   },
 });

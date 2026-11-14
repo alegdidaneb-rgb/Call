@@ -56,12 +56,12 @@ function formatDuration(totalSeconds: number): string {
 
 /** Connection state as a dot colour plus a word an operator can act on. */
 const STATUS_VIEW = {
-  unconfigured: { label: "Not configured", dot: "bg-gray-400", text: "text-gray-500" },
-  disconnected: { label: "Disconnected", dot: "bg-gray-400", text: "text-gray-500" },
-  connecting: { label: "Connecting", dot: "bg-amber-400 animate-pulse", text: "text-amber-600" },
-  registering: { label: "Registering", dot: "bg-amber-400 animate-pulse", text: "text-amber-600" },
-  registered: { label: "Ready to call", dot: "bg-green-500", text: "text-green-600" },
-  error: { label: "Connection error", dot: "bg-red-500", text: "text-red-600" },
+  unconfigured: { label: "Not configured", dot: "bg-steel", text: "text-muted" },
+  disconnected: { label: "Disconnected", dot: "bg-steel", text: "text-muted" },
+  connecting: { label: "Connecting", dot: "bg-warning animate-pulse", text: "text-warning" },
+  registering: { label: "Registering", dot: "bg-warning animate-pulse", text: "text-warning" },
+  registered: { label: "Ready to call", dot: "bg-success", text: "text-success" },
+  error: { label: "Connection error", dot: "bg-danger", text: "text-danger" },
 } as const;
 
 export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
@@ -150,8 +150,8 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
 
   if (!lead) {
     return (
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex items-center justify-center h-48 text-gray-400">
+      <div className="bg-panel rounded-xl border border-line p-6">
+        <div className="flex items-center justify-center h-48 text-faint">
           <div className="text-center">
             <Phone className="w-12 h-12 mx-auto mb-3 opacity-50" />
             <p className="text-sm font-medium">Select a lead to start a call</p>
@@ -163,15 +163,15 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div className="bg-panel rounded-xl border border-line overflow-hidden">
       {/* Header */}
       <div
         className={`px-5 py-4 ${
           snapshot.callState === "active" || snapshot.callState === "held"
-            ? "bg-gradient-to-r from-green-600 to-green-700"
+            ? "bg-gradient-to-r from-success to-success/90"
             : snapshot.callState === "ended"
-              ? "bg-gradient-to-r from-red-600 to-red-700"
-              : "bg-gradient-to-r from-brand-600 to-brand-700"
+              ? "bg-gradient-to-r from-danger to-danger/90"
+              : "bg-gradient-to-r from-accent to-accent-strong"
         }`}
       >
         <div className="flex items-center gap-4">
@@ -214,18 +214,18 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
       <div className="p-5 space-y-4">
         {/* Number being dialled */}
         <div className="text-center">
-          <p className="text-2xl font-mono font-semibold text-gray-900 truncate">
+          <p className="text-2xl font-mono font-semibold text-ink truncate">
             {dial.display || lead.phone || "—"}
           </p>
           <p
             className={`text-xs mt-1 font-medium ${
               snapshot.callState === "active"
-                ? "text-green-600"
+                ? "text-success"
                 : snapshot.callState === "ended"
-                  ? "text-red-600"
+                  ? "text-danger"
                   : snapshot.callState === "held"
-                    ? "text-amber-600"
-                    : "text-gray-400"
+                    ? "text-warning"
+                    : "text-faint"
             }`}
           >
             {snapshot.callState === "idle" && "Ready"}
@@ -237,23 +237,23 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
             {snapshot.startedAtMs === null && snapshot.callState === "ended" && " (never answered)"}
           </p>
           {account?.label && (
-            <p className="text-[11px] text-gray-400 mt-0.5 truncate">via {account.label}</p>
+            <p className="text-[11px] text-faint mt-0.5 truncate">via {account.label}</p>
           )}
         </div>
 
         {/* A number that cannot be dialled safely is reported, not guessed at. */}
         {dial.warning && !inCall && (
-          <div className="flex gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
-            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-            <p className="text-xs text-amber-800">{dial.warning}</p>
+          <div className="flex gap-2 rounded-lg bg-warning/12 border border-warning/30 px-3 py-2">
+            <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
+            <p className="text-xs text-warning">{dial.warning}</p>
           </div>
         )}
 
         {/* Engine failures, classified. Never replaced by a pretend call. */}
         {snapshot.failure && (
-          <div className="flex gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2">
-            <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-            <div className="text-xs text-red-800">
+          <div className="flex gap-2 rounded-lg bg-danger/12 border border-danger/30 px-3 py-2">
+            <AlertTriangle className="w-4 h-4 text-danger shrink-0 mt-0.5" />
+            <div className="text-xs text-danger">
               <p className="font-semibold">{snapshot.failure.message}</p>
               {snapshot.failure.hint && <p className="mt-0.5">{snapshot.failure.hint}</p>}
             </div>
@@ -276,7 +276,7 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
                       ? "Not registered with the SIP server yet"
                       : "This number cannot be dialled as stored"
               }
-              className="w-14 h-14 rounded-full bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center text-white shadow-lg shadow-green-500/30 transition hover:scale-105 disabled:hover:scale-100"
+              className="w-14 h-14 rounded-full bg-success hover:bg-success disabled:bg-line-strong disabled:cursor-not-allowed flex items-center justify-center text-white shadow-lg shadow-success/30 transition hover:scale-105 disabled:hover:scale-100"
             >
               {snapshot.status === "connecting" || snapshot.status === "registering" ? (
                 <Loader2 className="w-6 h-6 animate-spin" />
@@ -290,7 +290,7 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
             <button
               type="button"
               onClick={() => sipEngine.reset()}
-              className="w-14 h-14 rounded-full bg-gray-500 hover:bg-gray-600 flex items-center justify-center text-white shadow-lg transition hover:scale-105"
+              className="w-14 h-14 rounded-full bg-steel hover:bg-steel-strong flex items-center justify-center text-white shadow-lg transition hover:scale-105"
               title="Clear the finished call"
             >
               <RotateCcw className="w-6 h-6" />
@@ -302,7 +302,7 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
               <button
                 type="button"
                 onClick={handleHangup}
-                className="w-14 h-14 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center text-white shadow-lg shadow-red-500/30 transition hover:scale-105"
+                className="w-14 h-14 rounded-full bg-danger hover:bg-danger flex items-center justify-center text-white shadow-lg shadow-danger/30 transition hover:scale-105"
                 title="Hang up"
               >
                 <PhoneOff className="w-6 h-6" />
@@ -312,7 +312,7 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
                 onClick={() => sipEngine.setMuted(!snapshot.muted)}
                 disabled={snapshot.callState !== "active" && snapshot.callState !== "held"}
                 className={`w-10 h-10 rounded-full flex items-center justify-center transition hover:scale-105 disabled:opacity-40 ${
-                  snapshot.muted ? "bg-red-100 text-red-600" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  snapshot.muted ? "bg-danger/12 text-danger" : "bg-hover text-muted hover:bg-line"
                 }`}
                 title={snapshot.muted ? "Unmute" : "Mute"}
               >
@@ -324,8 +324,8 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
                 disabled={snapshot.callState !== "active" && snapshot.callState !== "held"}
                 className={`w-10 h-10 rounded-full flex items-center justify-center transition hover:scale-105 disabled:opacity-40 ${
                   snapshot.callState === "held"
-                    ? "bg-amber-100 text-amber-600"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    ? "bg-warning/12 text-warning"
+                    : "bg-hover text-muted hover:bg-line"
                 }`}
                 title={snapshot.callState === "held" ? "Resume" : "Hold"}
               >
@@ -341,7 +341,7 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
             type="button"
             onClick={() => setKeypadVisible((visible) => !visible)}
             className={`p-2 rounded-lg transition ${
-              keypadVisible ? "bg-brand-100 text-brand-700" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              keypadVisible ? "bg-accent/12 text-accent" : "bg-hover text-muted hover:bg-line"
             }`}
             title={inCall ? "Send DTMF tones" : "Dial a different number"}
           >
@@ -357,13 +357,13 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
                   value={manualNumber}
                   onChange={(event) => setManualNumber(event.target.value)}
                   placeholder={lead.phone ?? "Number"}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
+                  className="flex-1 px-3 py-2 border border-line-strong rounded-lg text-sm font-mono focus:ring-2 focus:ring-accent focus:border-accent outline-none"
                 />
                 {manualNumber && (
                   <button
                     type="button"
                     onClick={() => setManualNumber("")}
-                    className="p-2 text-gray-400 hover:text-gray-600"
+                    className="p-2 text-faint hover:text-muted"
                     title="Clear"
                   >
                     <X className="w-4 h-4" />
@@ -377,27 +377,27 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
                   key={digit}
                   type="button"
                   onClick={() => handleKeypad(digit)}
-                  className="w-full aspect-square flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-lg font-semibold text-gray-800 transition"
+                  className="w-full aspect-square flex items-center justify-center bg-hover hover:bg-line rounded-lg text-lg font-semibold text-ink transition"
                 >
                   {digit}
                 </button>
               ))}
             </div>
-            {inCall && <p className="text-center text-[11px] text-gray-400">Tones are sent to the call</p>}
+            {inCall && <p className="text-center text-[11px] text-faint">Tones are sent to the call</p>}
           </div>
         )}
 
         {/* Post-call disposition */}
-        <div className="border-t border-gray-100 pt-4 space-y-3">
+        <div className="border-t border-line pt-4 space-y-3">
           <div>
-            <label htmlFor="call-outcome" className="block text-xs font-medium text-gray-500 mb-1">
+            <label htmlFor="call-outcome" className="block text-xs font-medium text-muted mb-1">
               Outcome
             </label>
             <select
               id="call-outcome"
               value={outcome}
               onChange={(event) => setOutcome(event.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none bg-white"
+              className="w-full px-3 py-2 border border-line-strong rounded-lg text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none bg-panel"
             >
               {OUTCOMES.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -407,7 +407,7 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
             </select>
           </div>
           <div>
-            <label htmlFor="call-notes" className="block text-xs font-medium text-gray-500 mb-1">
+            <label htmlFor="call-notes" className="block text-xs font-medium text-muted mb-1">
               Notes
             </label>
             <textarea
@@ -415,7 +415,7 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none resize-none"
+              className="w-full px-3 py-2 border border-line-strong rounded-lg text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none resize-none"
               placeholder="Add call notes..."
             />
           </div>
@@ -423,12 +423,12 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
             type="button"
             onClick={handleSave}
             disabled={snapshot.callState !== "ended"}
-            className="w-full py-2.5 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg transition"
+            className="w-full py-2.5 text-sm font-semibold text-white bg-accent hover:bg-accent-strong disabled:bg-line-strong disabled:cursor-not-allowed rounded-lg transition"
           >
             Save &amp; Next
           </button>
           {snapshot.callId && (
-            <p className="text-[11px] text-gray-400 text-center font-mono truncate">
+            <p className="text-[11px] text-faint text-center font-mono truncate">
               call id {snapshot.callId}
             </p>
           )}
@@ -436,13 +436,13 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
 
         {/* Always-available escape hatch: dial with the operator's own phone. */}
         {telHref && !inCall && (
-          <div className="border-t border-gray-100 pt-3 flex items-center justify-between gap-2">
-            <span className="text-xs text-gray-500">
+          <div className="border-t border-line pt-3 flex items-center justify-between gap-2">
+            <span className="text-xs text-muted">
               {configured ? "Prefer another phone?" : "No web phone set up yet."}
             </span>
             <a
               href={telHref}
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-700 hover:text-brand-800"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-accent hover:text-accent"
             >
               <ExternalLink className="w-3.5 h-3.5" />
               Open in phone app
@@ -475,21 +475,21 @@ function ConnectionFooter({
   return (
     <div
       className={`px-5 py-2.5 border-t flex items-center justify-between gap-2 text-xs ${
-        needsAttention ? "bg-amber-50 border-amber-200" : "bg-gray-50 border-gray-200"
+        needsAttention ? "bg-warning/12 border-warning/30" : "bg-app border-line"
       }`}
     >
       <span className="flex items-center gap-2">
         <span className={`w-2 h-2 rounded-full ${view.dot}`} />
-        <span className={needsAttention ? "text-amber-800" : view.text}>{view.label}</span>
+        <span className={needsAttention ? "text-warning" : view.text}>{view.label}</span>
       </span>
       {needsAttention &&
         (isAdmin ? (
-          <Link to="/phone" className="inline-flex items-center gap-1 font-medium text-amber-900 hover:underline">
+          <Link to="/phone" className="inline-flex items-center gap-1 font-medium text-warning hover:underline">
             <Settings className="w-3.5 h-3.5" />
             Set up phone
           </Link>
         ) : (
-          <span className="inline-flex items-center gap-1 text-amber-900">
+          <span className="inline-flex items-center gap-1 text-warning">
             <Check className="w-3.5 h-3.5" />
             Ask an administrator
           </span>

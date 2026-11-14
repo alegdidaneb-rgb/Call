@@ -37,28 +37,28 @@ export function CampaignForm({ onClose, onSubmit, initialData }: CampaignFormPro
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-xl shadow-xl max-w-lg w-full">
-        <div className="flex items-center justify-between p-5 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">{initialData ? "Edit Campaign" : "New Campaign"}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+      <div className="bg-panel rounded-xl shadow-xl max-w-lg w-full">
+        <div className="flex items-center justify-between p-5 border-b border-line">
+          <h2 className="text-lg font-semibold text-ink">{initialData ? "Edit Campaign" : "New Campaign"}</h2>
+          <button onClick={onClose} className="text-faint hover:text-muted"><X className="w-5 h-5" /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Campaign Name</label>
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)} required className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none" />
+            <label className="block text-sm font-medium text-ink mb-1">Campaign Name</label>
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)} required className="w-full px-3 py-2 border border-line-strong rounded-lg text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-              <select value={type} onChange={(e) => setType(e.target.value as typeof type)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none bg-white">
+              <label className="block text-sm font-medium text-ink mb-1">Type</label>
+              <select value={type} onChange={(e) => setType(e.target.value as typeof type)} className="w-full px-3 py-2 border border-line-strong rounded-lg text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none bg-panel">
                 <option value="outbound">Outbound</option>
                 <option value="inbound">Inbound</option>
                 <option value="blended">Blended</option>
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-              <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none bg-white">
+              <label className="block text-sm font-medium text-ink mb-1">Status</label>
+              <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)} className="w-full px-3 py-2 border border-line-strong rounded-lg text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none bg-panel">
                 <option value="active">Active</option>
                 <option value="paused">Paused</option>
                 <option value="completed">Completed</option>
@@ -66,13 +66,13 @@ export function CampaignForm({ onClose, onSubmit, initialData }: CampaignFormPro
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Settings (JSON)</label>
-            <textarea value={settingsText} onChange={(e) => setSettingsText(e.target.value)} rows={4} className={`w-full px-3 py-2 border rounded-lg text-sm font-mono focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none resize-none ${settingsError ? "border-red-300 bg-red-50" : "border-gray-300"}`} />
-            {settingsError && <p className="text-xs text-red-600 mt-1">{settingsError}</p>}
+            <label className="block text-sm font-medium text-ink mb-1">Settings (JSON)</label>
+            <textarea value={settingsText} onChange={(e) => setSettingsText(e.target.value)} rows={4} className={`w-full px-3 py-2 border rounded-lg text-sm font-mono focus:ring-2 focus:ring-accent focus:border-accent outline-none resize-none ${settingsError ? "border-danger/30 bg-danger/12" : "border-line-strong"}`} />
+            {settingsError && <p className="text-xs text-danger mt-1">{settingsError}</p>}
           </div>
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition">Cancel</button>
-            <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition">Save Campaign</button>
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-ink bg-hover hover:bg-line rounded-lg transition">Cancel</button>
+            <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-accent hover:bg-accent-strong rounded-lg transition">Save Campaign</button>
           </div>
         </form>
       </div>
