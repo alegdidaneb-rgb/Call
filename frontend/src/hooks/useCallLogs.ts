@@ -1,12 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { api } from "@/lib/apiClient";
+import { api, isApiMode } from "@/lib/apiClient";
 import type { Database } from "@/types/database";
 
 type CallLog = Database["public"]["Tables"]["call_logs"]["Row"];
 
-const API_URL = import.meta.env.VITE_API_URL || "";
-const isApiMode = Boolean(API_URL);
 
 export function useCallLogs() {
   return useQuery<CallLog[]>({

@@ -1,18 +1,22 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { fetchSetupStatus, signIn } from "@/lib/auth";
-import { LogIn, Mail, Lock, AlertCircle, CheckCircle2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, LogIn, Mail } from "lucide-react";
 import { z } from "zod";
+import { AuthScreen } from "@/components/auth/AuthScreen";
+import { PasswordField } from "@/components/auth/PasswordField";
+import { fetchSetupStatus, signIn } from "@/lib/auth";
 
 const loginSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
-  password: z.string().min(1, "Password is required"),
+  email: z.string().email("Enter a valid email address"),
+  password: z.string().min(1, "Enter your password"),
 });
 
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const emailId = useId();
   const justCreated = Boolean((location.state as { created?: boolean } | null)?.created);
+
   /** Only a deployment with no accounts at all offers the setup screen. */
   const [needsSetup, setNeedsSetup] = useState(false);
   const [email, setEmail] = useState("");
@@ -23,26 +27,32 @@ export function LoginPage() {
 
   useEffect(() => {
     let active = true;
-    void fetchSetupStatus().then((status) => {
-      if (active) setNeedsSetup(status.needsSetup);
-    });
+    // A rejected status check must not become an unhandled rejection: the form
+    // is still usable, it simply cannot offer the setup link.
+    fetchSetupStatus()
+      .then((status) => {
+        if (active) setNeedsSetup(status.needsSetup);
+      })
+      .catch(() => {
+        if (active) setNeedsSetup(false);
+      });
     return () => {
       active = false;
     };
   }, []);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
     setError("");
     setFieldErrors({});
 
     const result = loginSchema.safeParse({ email, password });
     if (!result.success) {
       const errs: Record<string, string> = {};
-      result.error.issues.forEach((issue) => {
+      for (const issue of result.error.issues) {
         const field = issue.path[0] as string;
-        errs[field] = issue.message;
-      });
+        if (field && !errs[field]) errs[field] = issue.message;
+      }
       setFieldErrors(errs);
       return;
     }
@@ -51,91 +61,106 @@ export function LoginPage() {
     try {
       await signIn(email, password);
       navigate("/workspace");
-    } catch (err: any) {
-      setError(err.message ?? "Login failed");
-    } finally {
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sign in failed");
       setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-accent/10 to-accent/16 px-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-accent">Cold Dialer</h1>
-          <p className="text-accent mt-2">Open-source SIP-powered dialer</p>
-        </div>
-        <form onSubmit={handleSubmit} className="bg-panel rounded-xl shadow-lg p-8 space-y-5">
-          <h2 className="text-xl font-semibold text-ink">Sign In</h2>
-          {justCreated && (
-            <div className="flex items-start gap-2 rounded-lg bg-success/12 border border-success/30 p-3 text-sm text-success">
-              <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>Administrator created. Sign in with the email and password you just set.</span>
-            </div>
-          )}
-
-          {error && (
-            <div className="flex items-center gap-2 text-danger bg-danger/12 p-3 rounded-lg text-sm">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              {error}
-            </div>
-          )}
-          <div>
-            <label className="block text-sm font-medium text-ink mb-1">Email</label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-faint w-5 h-5" />
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-accent focus:border-accent outline-none transition ${fieldErrors.email ? "border-danger/30 bg-danger/12" : "border-line-strong"}`}
-                placeholder="you@company.com"
-              />
-            </div>
-            {fieldErrors.email && <p className="text-xs text-danger mt-1">{fieldErrors.email}</p>}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-ink mb-1">Password</label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-faint w-5 h-5" />
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-accent focus:border-accent outline-none transition ${fieldErrors.password ? "border-danger/30 bg-danger/12" : "border-line-strong"}`}
-                placeholder="••••••••"
-              />
-            </div>
-            {fieldErrors.password && <p className="text-xs text-danger mt-1">{fieldErrors.password}</p>}
-          </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-2 bg-accent hover:bg-accent-strong disabled:bg-accent text-white font-semibold py-3 rounded-lg transition"
+    <AuthScreen
+      tagline="Outbound calling for teams that work a list"
+      title="Sign in"
+      description="Use the account an administrator created for you."
+      footer={
+        needsSetup ? (
+          <p>
+            This deployment has no accounts yet.{" "}
+            <Link to="/setup" className="font-semibold text-accent hover:text-accent-strong">
+              Set it up
+            </Link>
+          </p>
+        ) : (
+          <p>Accounts are created by an administrator from the Team page.</p>
+        )
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        {justCreated ? (
+          <div
+            className="flex items-start gap-2 rounded-lg border border-success/30 bg-success/12 p-3 text-sm text-success"
+            role="status"
           >
-            {loading ? (
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <>
-                <LogIn className="w-5 h-5" />
-                Sign In
-              </>
-            )}
-          </button>
-          {needsSetup ? (
-            <p className="text-center text-sm text-muted">
-              No accounts yet?{" "}
-              <Link to="/setup" className="font-medium text-accent hover:text-accent">
-                Set up this deployment
-              </Link>
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              The administrator account was created. Sign in with the email and password you just
+              set.
+            </span>
+          </div>
+        ) : null}
+
+        {error ? (
+          <div
+            className="flex items-start gap-2 rounded-lg border border-danger/30 bg-danger/12 p-3 text-sm text-danger"
+            role="alert"
+          >
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        ) : null}
+
+        <div>
+          <label className="label" htmlFor={emailId}>
+            Email
+          </label>
+          <div className="relative">
+            <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
+            <input
+              id={emailId}
+              name="email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              autoComplete="email"
+              placeholder="you@company.com"
+              autoFocus
+              aria-invalid={Boolean(fieldErrors.email)}
+              aria-describedby={fieldErrors.email ? `${emailId}-error` : undefined}
+              className={`input !pl-9 ${fieldErrors.email ? "!border-danger/50" : ""}`}
+            />
+          </div>
+          {fieldErrors.email ? (
+            <p id={`${emailId}-error`} className="mt-1 text-xs text-danger" role="alert">
+              {fieldErrors.email}
             </p>
+          ) : null}
+        </div>
+
+        <PasswordField
+          label="Password"
+          value={password}
+          onChange={setPassword}
+          autoComplete="current-password"
+          error={fieldErrors.password}
+        />
+
+        <button type="submit" disabled={loading} className="btn btn-primary w-full !py-2.5">
+          {loading ? (
+            <>
+              <span
+                className="h-4 w-4 animate-spin rounded-full border-2 border-inverse border-t-transparent"
+                aria-hidden="true"
+              />
+              Signing in…
+            </>
           ) : (
-            <p className="text-center text-sm text-muted">
-              Accounts are created by an administrator.
-            </p>
+            <>
+              <LogIn className="h-4 w-4" />
+              Sign in
+            </>
           )}
-        </form>
-      </div>
-    </div>
+        </button>
+      </form>
+    </AuthScreen>
   );
 }

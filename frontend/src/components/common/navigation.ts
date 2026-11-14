@@ -33,7 +33,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: "/workspace", label: "Workspace", icon: Headset, group: "Work" },
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, group: "Work" },
   { to: "/leads", label: "Leads", icon: Users, group: "Work" },
-  { to: "/history", label: "Call History", icon: Clock, group: "Work" },
+  { to: "/history", label: "Call history", icon: Clock, group: "Work" },
   { to: "/campaigns", label: "Campaigns", icon: Target, group: "Manage" },
   { to: "/scripts", label: "Scripts", icon: FileText, group: "Manage" },
   { to: "/phone", label: "Phone", icon: PhoneCall, group: "Admin", roles: ["admin"] },

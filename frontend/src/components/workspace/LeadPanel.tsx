@@ -84,10 +84,10 @@ function Detail({
     <>
       <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-faint" />
       <span className="min-w-0 flex-1">
-        <span className="block text-[10px] font-semibold uppercase tracking-wider text-faint">
+        <span className="block text-2xs font-semibold uppercase tracking-wider text-faint">
           {label}
         </span>
-        <span className="block truncate text-[13px] text-ink" title={value ?? undefined}>
+        <span className="block truncate text-sm text-ink" title={value ?? undefined}>
           {value || "—"}
         </span>
       </span>
@@ -151,7 +151,7 @@ export function LeadPanel({ lead, campaignName, isLoadingQueue }: LeadPanelProps
         <div className="flex min-w-0 items-center gap-2">
           <span className="pane-title">Lead</span>
           {campaignName ? (
-            <span className="truncate text-[11px] text-faint">· {campaignName}</span>
+            <span className="truncate text-2xs text-faint">· {campaignName}</span>
           ) : null}
         </div>
         <Link
@@ -213,12 +213,12 @@ export function LeadPanel({ lead, campaignName, isLoadingQueue }: LeadPanelProps
           {/* Script */}
           <div className="card overflow-hidden animate-rise-in">
             <div className="flex items-center justify-between gap-2 border-b border-line px-3 py-2">
-              <h3 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-faint">
+              <h3 className="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wider text-faint">
                 <FileText className="h-3.5 w-3.5" />
                 Call script
               </h3>
               {script ? (
-                <span className="truncate text-[10px] text-faint">
+                <span className="truncate text-2xs text-faint">
                   {isExactMatch ? "for this campaign" : "general"}
                 </span>
               ) : null}
@@ -235,32 +235,32 @@ export function LeadPanel({ lead, campaignName, isLoadingQueue }: LeadPanelProps
                 <div>
                   <p className="text-sm font-semibold text-ink">{script.title}</p>
                   {script.category ? (
-                    <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-faint">
+                    <p className="mt-0.5 text-2xs font-semibold uppercase tracking-wider text-faint">
                       {script.category}
                     </p>
                   ) : null}
                 </div>
-                <p className="max-h-56 overflow-y-auto whitespace-pre-wrap text-[13px] leading-relaxed text-muted">
+                <p className="max-h-56 overflow-y-auto whitespace-pre-wrap text-sm leading-relaxed text-muted">
                   {script.content}
                 </p>
                 {objections.length > 0 ? (
                   <div className="space-y-1.5 border-t border-line pt-2.5">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-faint">
+                    <p className="text-2xs font-semibold uppercase tracking-wider text-faint">
                       If they object
                     </p>
                     {objections.map((entry) => (
                       <details key={entry.objection} className="group rounded-lg bg-inset px-2.5 py-1.5">
-                        <summary className="cursor-pointer list-none text-[12px] font-semibold text-ink marker:content-none">
+                        <summary className="cursor-pointer list-none text-xs font-semibold text-ink marker:content-none">
                           <span className="flex items-center justify-between gap-2">
                             <span className="truncate capitalize">{entry.objection}</span>
-                            <span className="shrink-0 text-[10px] text-faint transition-transform group-open:rotate-90">
+                            <span className="shrink-0 text-2xs text-faint transition-transform group-open:rotate-90">
                               ›
                             </span>
                           </span>
                         </summary>
-                        <p className="mt-1.5 text-[12px] leading-relaxed text-muted">{entry.response}</p>
+                        <p className="mt-1.5 text-xs leading-relaxed text-muted">{entry.response}</p>
                         {entry.category ? (
-                          <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-faint">
+                          <p className="mt-1 text-2xs font-semibold uppercase tracking-wider text-faint">
                             {entry.category}
                           </p>
                         ) : null}
@@ -270,7 +270,7 @@ export function LeadPanel({ lead, campaignName, isLoadingQueue }: LeadPanelProps
                 ) : null}
               </div>
             ) : (
-              <p className="px-3 py-4 text-center text-[12px] leading-relaxed text-faint">
+              <p className="px-3 py-4 text-center text-xs leading-relaxed text-faint">
                 No script has been written for this campaign.{" "}
                 <Link to="/scripts" className="font-semibold text-accent underline underline-offset-2">
                   Add one
@@ -283,11 +283,11 @@ export function LeadPanel({ lead, campaignName, isLoadingQueue }: LeadPanelProps
           {/* History */}
           <div className="card overflow-hidden">
             <div className="flex items-center justify-between gap-2 border-b border-line px-3 py-2">
-              <h3 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-faint">
+              <h3 className="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wider text-faint">
                 <History className="h-3.5 w-3.5" />
                 Previous calls
               </h3>
-              <span className="tabular text-[10px] text-faint">{calls.length}</span>
+              <span className="tabular text-2xs text-faint">{calls.length}</span>
             </div>
 
             {history.isLoading ? (
@@ -296,7 +296,7 @@ export function LeadPanel({ lead, campaignName, isLoadingQueue }: LeadPanelProps
                 <Skeleton className="h-8 w-full" />
               </div>
             ) : calls.length === 0 ? (
-              <p className="px-3 py-4 text-center text-[12px] text-faint">
+              <p className="px-3 py-4 text-center text-xs text-faint">
                 Never called. This is the first attempt.
               </p>
             ) : (
@@ -311,16 +311,16 @@ export function LeadPanel({ lead, campaignName, isLoadingQueue }: LeadPanelProps
                       />
                       <span className="min-w-0 flex-1">
                         <span className="flex flex-wrap items-baseline gap-x-2">
-                          <span className={`text-[12px] font-semibold ${textClass(callTone)}`}>
+                          <span className={`text-xs font-semibold ${textClass(callTone)}`}>
                             {outcomeLabel(call.outcome)}
                           </span>
-                          <span className="tabular text-[10px] text-faint">
+                          <span className="tabular text-2xs text-faint">
                             {ago(call.started_at ?? call.created_at)} ·{" "}
                             {formatDuration(call.duration_seconds)}
                           </span>
                         </span>
                         {call.notes ? (
-                          <span className="mt-0.5 block truncate text-[11px] text-muted" title={call.notes}>
+                          <span className="mt-0.5 block truncate text-2xs text-muted" title={call.notes}>
                             {call.notes}
                           </span>
                         ) : null}

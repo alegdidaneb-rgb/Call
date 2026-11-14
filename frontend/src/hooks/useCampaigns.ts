@@ -1,12 +1,22 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { api } from "@/lib/apiClient";
+import { api, isApiMode } from "@/lib/apiClient";
 import type { Database } from "@/types/database";
 
 type Campaign = Database["public"]["Tables"]["campaigns"]["Row"];
+type CampaignInsert = Database["public"]["Tables"]["campaigns"]["Insert"];
 
-const API_URL = import.meta.env.VITE_API_URL || "";
-const isApiMode = Boolean(API_URL);
+/**
+ * What a new campaign must supply. `type` and `status` are database enums, not
+ * free text: declaring them `string` let a typo reach the insert and come back
+ * as a constraint error at runtime instead of a red squiggle at the call site.
+ */
+export interface NewCampaignInput {
+  name: string;
+  type: NonNullable<CampaignInsert["type"]>;
+  status: NonNullable<CampaignInsert["status"]>;
+  settings: CampaignInsert["settings"];
+}
 
 export function useCampaigns() {
   return useQuery<Campaign[]>({
@@ -27,7 +37,7 @@ export function useCampaigns() {
 
 export function useCreateCampaign() {
   const queryClient = useQueryClient();
-  return useMutation<Campaign, Error, { name: string; type: string; status: string; settings: Record<string, unknown> | null }>({
+  return useMutation<Campaign, Error, NewCampaignInput>({
     mutationFn: async ({ name, type, status, settings }) => {
       if (isApiMode) {
         return api.campaigns.create({ name, type, status, settings });

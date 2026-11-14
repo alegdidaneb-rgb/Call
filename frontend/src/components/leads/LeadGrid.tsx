@@ -173,7 +173,7 @@ export function LeadGrid({
   return (
     <section className="card flex min-h-[20rem] flex-1 flex-col overflow-hidden">
       {/* Column headers */}
-      <div className="flex shrink-0 items-center gap-2 border-b border-line bg-inset px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-faint">
+      <div className="flex shrink-0 items-center gap-2 border-b border-line bg-inset px-3 py-2 text-2xs font-semibold uppercase tracking-wider text-faint">
         <span className="w-5 shrink-0">
           <button
             type="button"
@@ -275,7 +275,7 @@ export function LeadGrid({
                     style={{ height: ROW_HEIGHT }}
                     onClick={(event) => handleRowClick(index, event)}
                     onDoubleClick={() => onOpen(lead)}
-                    className={`flex items-center gap-2 border-b border-line px-3 text-[13px] transition-colors duration-75 ${
+                    className={`flex items-center gap-2 border-b border-line px-3 text-sm transition-colors duration-75 ${
                       isSelected
                         ? "row-selected"
                         : isActive
@@ -298,7 +298,7 @@ export function LeadGrid({
 
                     <span className="flex min-w-0 flex-1 items-center gap-2">
                       <span
-                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-2xs font-bold ${
                           isSelected ? "bg-accent text-inverse" : "bg-inset text-muted"
                         }`}
                         aria-hidden="true"
@@ -311,7 +311,7 @@ export function LeadGrid({
                         >
                           {leadName(lead)}
                         </span>
-                        <span className="tabular block truncate font-mono text-[10px] text-faint md:hidden">
+                        <span className="tabular block truncate font-mono text-2xs text-faint md:hidden">
                           {lead.phone || "no number"}
                         </span>
                       </span>
@@ -327,7 +327,7 @@ export function LeadGrid({
                       {lead.company || "—"}
                     </span>
 
-                    <span className="tabular hidden w-40 shrink-0 truncate font-mono text-[12px] text-muted lg:block">
+                    <span className="tabular hidden w-40 shrink-0 truncate font-mono text-xs text-muted lg:block">
                       {lead.phone || "—"}
                     </span>
 
@@ -347,7 +347,7 @@ export function LeadGrid({
                         onClick={(event) => event.stopPropagation()}
                         onChange={(event) => onStatusChange(lead, event.target.value as LeadStatus)}
                         aria-label={`Status of ${leadName(lead)}`}
-                        className={`chip w-full cursor-pointer appearance-none border-0 !px-2 !py-0.5 !text-[10px] outline-none focus:ring-2 focus:ring-accent ${chipClass(tone)}`}
+                        className={`chip w-full cursor-pointer appearance-none border-0 !px-2 !py-0.5 !text-2xs outline-none focus:ring-2 focus:ring-accent ${chipClass(tone)}`}
                       >
                         {STATUS_OPTIONS.map((option) => (
                           <option key={option.value} value={option.value} className="bg-panel text-ink">
@@ -361,7 +361,7 @@ export function LeadGrid({
                       {lead.call_count ?? 0}
                     </span>
 
-                    <span className="tabular hidden w-28 shrink-0 text-right text-[11px] text-faint lg:block">
+                    <span className="tabular hidden w-28 shrink-0 text-right text-2xs text-faint lg:block">
                       {relativeDay(lead.last_called_at)}
                     </span>
 
@@ -400,7 +400,7 @@ export function LeadGrid({
       </div>
 
       {/* Footer */}
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-line bg-inset px-3 py-1.5 text-[11px] text-faint">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-line bg-inset px-3 py-1.5 text-2xs text-faint">
         <span className="tabular">
           {leads.length} row{leads.length === 1 ? "" : "s"}
           {selectedIds.size > 0 ? ` · ${selectedIds.size} selected` : ""}

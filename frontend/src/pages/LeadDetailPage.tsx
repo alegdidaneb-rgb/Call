@@ -99,7 +99,7 @@ export function LeadDetailPage() {
         </button>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-ink">
+            <h1 className="text-2xl font-bold tracking-tight text-ink">
               {lead.first_name} {lead.last_name}
             </h1>
             <StatusBadge status={lead.status} />
@@ -127,14 +127,14 @@ export function LeadDetailPage() {
           <div className="bg-panel rounded-xl border border-line p-5">
             <div className="flex items-center gap-2 mb-4">
               <FileText className="w-4 h-4 text-accent" />
-              <h2 className="text-lg font-semibold text-ink">Call Script</h2>
+              <h2 className="text-lg font-semibold text-ink">Call script</h2>
             </div>
             <button onClick={() => setShowScript(true)} className="text-sm text-accent hover:text-accent font-medium">
               View Script →
             </button>
           </div>
           <div className="bg-panel rounded-xl border border-line p-5">
-            <h2 className="text-lg font-semibold text-ink mb-4">Contact Info</h2>
+            <h2 className="text-lg font-semibold text-ink mb-4">Contact info</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="flex items-center gap-2 text-sm">
                 <Phone className="w-4 h-4 text-faint" />
@@ -162,7 +162,7 @@ export function LeadDetailPage() {
 
         <div className="space-y-6">
           <div className="bg-panel rounded-xl border border-line p-5">
-            <h2 className="text-lg font-semibold text-ink mb-4">Lead Details</h2>
+            <h2 className="text-lg font-semibold text-ink mb-4">Lead details</h2>
             <dl className="space-y-3">
               {[
                 ["Status", lead.status],
@@ -180,7 +180,7 @@ export function LeadDetailPage() {
                     : "—",
                 ],
                 ["Calls", String(lead.call_count ?? 0)],
-                ["Last Called", lead.last_called_at ? new Date(lead.last_called_at).toLocaleString() : "Never"],
+                ["Last called", lead.last_called_at ? new Date(lead.last_called_at).toLocaleString() : "Never"],
                 ["Created", new Date(lead.created_at).toLocaleDateString()],
               ].map(([label, value]) => (
                 <div key={label}>
@@ -193,7 +193,7 @@ export function LeadDetailPage() {
 
           {callLogs && callLogs.length > 0 && (
             <div className="bg-panel rounded-xl border border-line p-5">
-              <h2 className="text-lg font-semibold text-ink mb-4">Recent Calls</h2>
+              <h2 className="text-lg font-semibold text-ink mb-4">Recent calls</h2>
               <div className="space-y-3">
                 {callLogs.slice(0, 5).map((log) => (
                   <div key={log.id} className="border-l-2 border-accent/40 pl-3 py-2">
@@ -214,7 +214,7 @@ export function LeadDetailPage() {
       {showDeleteConfirm && (
         <ConfirmDialog
           open={showDeleteConfirm}
-          title="Delete Lead"
+          title="Delete lead"
           message={`Delete "${lead.first_name} ${lead.last_name}"? This cannot be undone.`}
           variant="danger"
           confirmLabel="Delete"
@@ -228,6 +228,7 @@ export function LeadDetailPage() {
 
       {showScript && (
         <CallScriptViewer
+          campaignId={lead?.campaign_id}
           onClose={() => setShowScript(false)}
         />
       )}

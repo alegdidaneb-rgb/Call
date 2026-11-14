@@ -240,12 +240,12 @@ export default function WorkspacePage() {
       <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-line bg-panel px-3 py-2">
         <div className="flex min-w-0 items-center gap-2">
           <h1 className="shrink-0 text-sm font-semibold text-ink">Workspace</h1>
-          <span className="tabular hidden shrink-0 rounded-full bg-inset px-2 py-0.5 text-[11px] font-semibold text-muted sm:inline">
+          <span className="tabular hidden shrink-0 rounded-full bg-inset px-2 py-0.5 text-2xs font-semibold text-muted sm:inline">
             {queue.stats.diallable} to call
           </span>
           {queue.stats.blocked > 0 ? (
             <span
-              className="tabular hidden shrink-0 rounded-full bg-danger/12 px-2 py-0.5 text-[11px] font-semibold text-danger md:inline"
+              className="tabular hidden shrink-0 rounded-full bg-danger/12 px-2 py-0.5 text-2xs font-semibold text-danger md:inline"
               title="Leads on the do-not-contact list. Never dialled."
             >
               {queue.stats.blocked} blocked
@@ -262,7 +262,7 @@ export default function WorkspacePage() {
                 queue.setOption("campaignId", event.target.value === "" ? null : event.target.value)
               }
               aria-label="Filter by campaign"
-              className="input !w-auto !py-1 !pl-7 !pr-7 !text-[12px]"
+              className="input !w-auto !py-1 !pl-7 !pr-7 !text-xs"
             >
               <option value="">All campaigns</option>
               {campaignList.map((campaign) => (
@@ -274,7 +274,7 @@ export default function WorkspacePage() {
           </div>
 
           <label
-            className="flex cursor-pointer items-center gap-1.5 text-[11px] font-medium text-muted"
+            className="flex cursor-pointer items-center gap-1.5 text-2xs font-medium text-muted"
             title="Include leads that are converted, declined or on the do-not-contact list"
           >
             <input

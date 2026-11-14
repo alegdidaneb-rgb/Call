@@ -24,6 +24,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { useNowMs, useSipAccount, useSipEngineSnapshot } from "@/hooks/useSip";
 import { flagEmoji } from "@/data/countries";
 import { domainFromSipUri } from "@/sip/config";
+import { OUTCOMES } from "@/lib/outcomes";
 import { buildDialTarget } from "@/sip/dialTarget";
 import { elapsedSeconds, sipEngine } from "@/sip/engine";
 import type { CallEndData } from "@/components/softphone/types";
@@ -35,16 +36,6 @@ interface SoftphoneProps {
   lead: Lead | null;
   onCallEnd?: (data: CallEndData) => void;
 }
-
-const OUTCOMES = [
-  { value: "answered", label: "Answered" },
-  { value: "no_answer", label: "No Answer" },
-  { value: "busy", label: "Busy" },
-  { value: "voicemail", label: "Voicemail" },
-  { value: "dnc", label: "DNC" },
-  { value: "wrong_number", label: "Wrong Number" },
-  { value: "disconnected", label: "Disconnected" },
-] as const;
 
 const KEYPAD = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"];
 
@@ -175,30 +166,30 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
         }`}
       >
         <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-full bg-inverse/20 flex items-center justify-center">
             {isIncoming && inCall ? (
-              <PhoneIncoming className="w-5 h-5 text-white" />
+              <PhoneIncoming className="w-5 h-5 text-inverse" />
             ) : (
-              <Phone className="w-5 h-5 text-white" />
+              <Phone className="w-5 h-5 text-inverse" />
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-white font-semibold truncate">
+            <p className="text-inverse font-semibold truncate">
               {lead.country ? `${flagEmoji(lead.country)} ` : ""}
               {lead.first_name} {lead.last_name}
             </p>
-            <p className="text-white/80 text-sm truncate">
+            <p className="text-inverse/80 text-sm truncate">
               {lead.company ?? lead.email ?? "No contact info"}
             </p>
           </div>
           <div className="text-right">
             {inCall || snapshot.callState === "ended" ? (
-              <div className="flex items-center gap-1 text-white text-sm justify-end">
+              <div className="flex items-center gap-1 text-inverse text-sm justify-end">
                 <Clock className="w-3.5 h-3.5" />
                 <span className="font-mono">{formatDuration(seconds)}</span>
               </div>
             ) : (
-              <div className="flex items-center gap-1.5 justify-end text-white/85 text-xs">
+              <div className="flex items-center gap-1.5 justify-end text-inverse/85 text-xs">
                 {snapshot.status === "registered" ? (
                   <Wifi className="w-3.5 h-3.5" />
                 ) : (
@@ -237,7 +228,7 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
             {snapshot.startedAtMs === null && snapshot.callState === "ended" && " (never answered)"}
           </p>
           {account?.label && (
-            <p className="text-[11px] text-faint mt-0.5 truncate">via {account.label}</p>
+            <p className="text-2xs text-faint mt-0.5 truncate">via {account.label}</p>
           )}
         </div>
 
@@ -276,7 +267,7 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
                       ? "Not registered with the SIP server yet"
                       : "This number cannot be dialled as stored"
               }
-              className="w-14 h-14 rounded-full bg-success hover:bg-success disabled:bg-line-strong disabled:cursor-not-allowed flex items-center justify-center text-white shadow-lg shadow-success/30 transition hover:scale-105 disabled:hover:scale-100"
+              className="w-14 h-14 rounded-full bg-success hover:bg-success disabled:bg-line-strong disabled:cursor-not-allowed flex items-center justify-center text-inverse shadow-raised shadow-success/30 transition hover:scale-105 disabled:hover:scale-100"
             >
               {snapshot.status === "connecting" || snapshot.status === "registering" ? (
                 <Loader2 className="w-6 h-6 animate-spin" />
@@ -290,7 +281,7 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
             <button
               type="button"
               onClick={() => sipEngine.reset()}
-              className="w-14 h-14 rounded-full bg-steel hover:bg-steel-strong flex items-center justify-center text-white shadow-lg transition hover:scale-105"
+              className="w-14 h-14 rounded-full bg-steel hover:bg-steel-strong flex items-center justify-center text-inverse shadow-raised transition hover:scale-105"
               title="Clear the finished call"
             >
               <RotateCcw className="w-6 h-6" />
@@ -302,7 +293,7 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
               <button
                 type="button"
                 onClick={handleHangup}
-                className="w-14 h-14 rounded-full bg-danger hover:bg-danger flex items-center justify-center text-white shadow-lg shadow-danger/30 transition hover:scale-105"
+                className="w-14 h-14 rounded-full bg-danger hover:bg-danger flex items-center justify-center text-inverse shadow-raised shadow-danger/30 transition hover:scale-105"
                 title="Hang up"
               >
                 <PhoneOff className="w-6 h-6" />
@@ -383,7 +374,7 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
                 </button>
               ))}
             </div>
-            {inCall && <p className="text-center text-[11px] text-faint">Tones are sent to the call</p>}
+            {inCall && <p className="text-center text-2xs text-faint">Tones are sent to the call</p>}
           </div>
         )}
 
@@ -423,12 +414,12 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
             type="button"
             onClick={handleSave}
             disabled={snapshot.callState !== "ended"}
-            className="w-full py-2.5 text-sm font-semibold text-white bg-accent hover:bg-accent-strong disabled:bg-line-strong disabled:cursor-not-allowed rounded-lg transition"
+            className="w-full py-2.5 text-sm font-semibold text-inverse bg-accent hover:bg-accent-strong disabled:bg-line-strong disabled:cursor-not-allowed rounded-lg transition"
           >
             Save &amp; Next
           </button>
           {snapshot.callId && (
-            <p className="text-[11px] text-faint text-center font-mono truncate">
+            <p className="text-2xs text-faint text-center font-mono truncate">
               call id {snapshot.callId}
             </p>
           )}

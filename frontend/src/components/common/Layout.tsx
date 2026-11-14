@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { usePreferences } from "@/components/common/PreferencesProvider";
+import { isTypingTarget } from "@/lib/keys";
 import { NAV_GROUPS, visibleNavItems } from "@/components/common/navigation";
 import { signOut } from "@/lib/auth";
 import { useSipBootstrap } from "@/hooks/useSip";
@@ -26,13 +27,6 @@ import { IncomingCallModal } from "@/components/softphone/IncomingCallModal";
 const CommandPalette = React.lazy(() =>
   import("@/components/common/CommandPalette").then((module) => ({ default: module.CommandPalette })),
 );
-
-/** True when a keystroke should reach a form field rather than a shortcut. */
-function isTypingTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  const tag = target.tagName;
-  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable;
-}
 
 const SIP_STATUS: Record<SipConnectionStatus, { label: string; dot: string; text: string }> = {
   registered: { label: "Registered", dot: "bg-success", text: "text-success" },
@@ -118,7 +112,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen overflow-hidden bg-app">
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/60 lg:hidden"
+          className="fixed inset-0 z-40 bg-overlay/60 lg:hidden"
           onClick={() => setSidebarOpen(false)}
           aria-hidden
         />
@@ -134,10 +128,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-inverse">
               <Phone className="h-3.5 w-3.5" />
             </span>
-            <span className="text-[15px] font-semibold tracking-tight text-ink">Cold Dialer</span>
+            <span className="text-base font-semibold tracking-tight text-ink">Cold Dialer</span>
           </NavLink>
           <button
-            className="rounded-md p-1 text-faint hover:bg-hover hover:text-ink lg:hidden"
+            className="rounded p-1 text-faint hover:bg-hover hover:text-ink lg:hidden"
             onClick={() => setSidebarOpen(false)}
             aria-label="Close navigation"
           >
@@ -151,7 +145,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             if (items.length === 0) return null;
             return (
               <div key={group} className="mt-4 first:mt-2">
-                <p className="px-2.5 pb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.09em] text-faint">
+                <p className="px-2.5 pb-1.5 text-2xs font-semibold uppercase tracking-[0.09em] text-faint">
                   {group}
                 </p>
                 <div className="space-y-0.5">
@@ -163,7 +157,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                         to={item.to}
                         end={item.to === "/dashboard"}
                         className={({ isActive }) =>
-                          `flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13.5px] transition-colors ${
+                          `flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors ${
                             isActive
                               ? "bg-accent/14 font-semibold text-accent"
                               : "font-medium text-muted hover:bg-hover hover:text-ink"
@@ -187,16 +181,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
               {initials || "U"}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-medium text-ink">
+              <p className="truncate text-sm font-medium text-ink">
                 {user?.fullName ?? user?.email ?? "User"}
               </p>
-              <p className="truncate text-[11px] capitalize text-faint">{role}</p>
+              <p className="truncate text-2xs capitalize text-faint">{role}</p>
             </div>
             <button
               onClick={handleSignOut}
               title="Sign out"
               aria-label="Sign out"
-              className="rounded-md p-1.5 text-faint transition hover:bg-danger/12 hover:text-danger"
+              className="rounded p-1.5 text-faint transition hover:bg-danger/12 hover:text-danger"
             >
               <LogOut className="h-4 w-4" />
             </button>
@@ -216,11 +210,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
           <button
             onClick={() => setPaletteOpen(true)}
-            className="flex h-9 min-w-0 flex-1 items-center gap-2.5 rounded-lg border border-line bg-inset px-3 text-left text-[13px] text-faint transition hover:border-line-strong hover:text-muted sm:max-w-md"
+            className="flex h-9 min-w-0 flex-1 items-center gap-2.5 rounded-lg border border-line bg-inset px-3 text-left text-sm text-faint transition hover:border-line-strong hover:text-muted sm:max-w-md"
           >
             <Search className="h-4 w-4 shrink-0" />
             <span className="truncate">Search leads or jump to a page…</span>
-            <kbd className="ml-auto hidden shrink-0 rounded border border-line bg-panel px-1.5 py-0.5 font-mono text-[10px] sm:block">
+            <kbd className="ml-auto hidden shrink-0 rounded border border-line bg-panel px-1.5 py-0.5 font-mono text-2xs sm:block">
               {modifier} K
             </kbd>
           </button>

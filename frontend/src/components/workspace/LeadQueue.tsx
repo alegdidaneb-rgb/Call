@@ -102,7 +102,7 @@ export function LeadQueue({
     >
       <div className="pane-head">
         <span className="pane-title">Queue</span>
-        <span className="tabular text-[11px] font-semibold text-muted">{leads.length}</span>
+        <span className="tabular text-2xs font-semibold text-muted">{leads.length}</span>
       </div>
 
       <div className="shrink-0 border-b border-line p-2">
@@ -115,7 +115,7 @@ export function LeadQueue({
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder="Filter queue"
             aria-label="Filter the queue"
-            className="input !py-1.5 !pl-8 !text-[13px]"
+            className="input !py-1.5 !pl-8 !text-sm"
           />
           <span className="kbd pointer-events-none absolute right-2 top-1/2 -translate-y-1/2">f</span>
         </div>
@@ -187,7 +187,7 @@ export function LeadQueue({
                     }`}
                   >
                     <span
-                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-2xs font-bold ${
                         isSelected ? "bg-accent text-inverse" : "bg-inset text-muted"
                       }`}
                       aria-hidden="true"
@@ -197,22 +197,22 @@ export function LeadQueue({
 
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-1.5">
-                        <span className="truncate text-[13px] font-semibold text-ink">
+                        <span className="truncate text-sm font-semibold text-ink">
                           {leadName(lead)}
                         </span>
                         {lead.country ? (
-                          <span className="shrink-0 text-[11px] leading-none" aria-hidden="true">
+                          <span className="shrink-0 text-2xs leading-none" aria-hidden="true">
                             {flagEmoji(lead.country)}
                           </span>
                         ) : null}
                       </span>
                       <span className="mt-0.5 flex items-center gap-1.5">
-                        <span className="tabular truncate font-mono text-[11px] text-muted">
+                        <span className="tabular truncate font-mono text-2xs text-muted">
                           {lead.phone || "no number"}
                         </span>
                         {(lead.call_count ?? 0) > 0 ? (
                           <span
-                            className="tabular shrink-0 text-[10px] font-semibold text-faint"
+                            className="tabular shrink-0 text-2xs font-semibold text-faint"
                             title={`Called ${lead.call_count} time${lead.call_count === 1 ? "" : "s"}`}
                           >
                             ×{lead.call_count}
@@ -222,7 +222,7 @@ export function LeadQueue({
                     </span>
 
                     <span className="flex shrink-0 flex-col items-end gap-1">
-                      <span className={`chip !px-1.5 !py-0 !text-[10px] ${chipClass(tone)}`}>
+                      <span className={`chip !px-1.5 !py-0 !text-2xs ${chipClass(tone)}`}>
                         {statusLabel(lead.status)}
                       </span>
                       {lead.status === "callback" ? (
@@ -238,7 +238,7 @@ export function LeadQueue({
       </div>
 
       <div className="shrink-0 border-t border-line px-3 py-2">
-        <p className="flex items-center gap-1.5 text-[10px] text-faint">
+        <p className="flex items-center gap-1.5 text-2xs text-faint">
           <PhoneOff className="h-3 w-3" />
           <span>Do-not-contact leads are never queued.</span>
         </p>

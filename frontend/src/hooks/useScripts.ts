@@ -1,14 +1,13 @@
 import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { api } from "@/lib/apiClient";
+import { api, isApiMode } from "@/lib/apiClient";
 import type { Database } from "@/types/database";
 
 type Script = Database["public"]["Tables"]["call_scripts"]["Row"];
 type ScriptInsert = Database["public"]["Tables"]["call_scripts"]["Insert"];
 
 /** Self-hosted deployments talk to the Express API instead of Supabase. */
-const isApiMode = Boolean(import.meta.env.VITE_API_URL);
 
 /**
  * Call scripts, read from the database.

@@ -3,7 +3,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { UserPlus, Users, Shield, AlertCircle, CheckCircle2 } from "lucide-react";
 import { createUser, listTeamMembers, type NewUserInput } from "@/lib/auth";
+import { PasswordField } from "@/components/auth/PasswordField";
+import { passwordSchema } from "@/lib/passwordPolicy";
 import type { AppRole } from "@/types/app";
+import { PageHeader } from "@/components/common/PageHeader";
 
 /**
  * Team management: the only place an account can be created.
@@ -19,11 +22,7 @@ const newUserSchema = z
   .object({
     fullName: z.string().min(2, "Name must be at least 2 characters"),
     email: z.string().trim().toLowerCase().email("Enter a valid email address"),
-    password: z
-      .string()
-      .min(10, "Password must be at least 10 characters")
-      .regex(/[a-zA-Z]/, "Password must contain a letter")
-      .regex(/[0-9]/, "Password must contain a number"),
+    password: passwordSchema,
     role: z.enum(["admin", "manager", "agent"]),
   });
 
@@ -94,24 +93,26 @@ export function TeamPage() {
     createMutation.mutate(parsed.data);
   }
 
+  /**
+   * Every text control on the page shares one definition, from `index.css`,
+   * instead of repeating the focus ring and border colours four times.
+   */
   const inputClass = (invalid?: string) =>
-    `w-full px-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-accent focus:border-accent outline-none transition text-sm ${
-      invalid ? "border-danger/30 bg-danger/12" : "border-line-strong"
+    `input ${
+      invalid ? "!border-danger/50" : ""
     }`;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-ink">Team</h1>
-        <p className="text-sm text-muted mt-1">
-          Accounts can only be created here, by an administrator. There is no public sign-up.
-        </p>
-      </div>
+      <PageHeader
+        title="Team"
+        description="Accounts can only be created here, by an administrator. There is no public sign-up."
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* --- Create account --------------------------------------------- */}
         <div className="lg:col-span-1">
-          <div className="bg-panel rounded-xl border border-line shadow-sm p-5">
+          <div className="bg-panel rounded-xl border border-line shadow-panel p-5">
             <div className="flex items-center gap-2 mb-4">
               <UserPlus className="w-5 h-5 text-accent" />
               <h2 className="text-base font-semibold text-ink">Add a team member</h2>
@@ -170,29 +171,17 @@ export function TeamPage() {
                 )}
               </div>
 
-              <div>
-                <label
-                  htmlFor="team-password"
-                  className="block text-sm font-medium text-ink mb-1"
-                >
-                  Temporary password
-                </label>
-                <input
-                  id="team-password"
-                  type="text"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="new-password"
-                  className={inputClass(fieldErrors.password)}
-                />
-                <p className="text-xs text-muted mt-1">
-                  At least 10 characters, including a letter and a number. Shown as text so you can
-                  copy it into a password manager to hand over.
-                </p>
-                {fieldErrors.password && (
-                  <p className="text-xs text-danger mt-1">{fieldErrors.password}</p>
-                )}
-              </div>
+              <PasswordField
+                id="team-password"
+                label="Temporary password"
+                value={password}
+                onChange={setPassword}
+                autoComplete="new-password"
+                error={fieldErrors.password}
+                requirements
+                defaultRevealed
+                hint="Shown in full so you can copy it into a password manager and hand it over. They can only change it once they can sign in."
+              />
 
               <div>
                 <span className="block text-sm font-medium text-ink mb-1">Role</span>
@@ -229,10 +218,10 @@ export function TeamPage() {
               <button
                 type="submit"
                 disabled={createMutation.isPending}
-                className="w-full py-2.5 rounded-lg bg-accent text-white text-sm font-semibold hover:bg-accent-strong disabled:opacity-60 transition flex items-center justify-center gap-2"
+                className="w-full py-2.5 rounded-lg bg-accent text-inverse text-sm font-semibold hover:bg-accent-strong disabled:opacity-60 transition flex items-center justify-center gap-2"
               >
                 {createMutation.isPending ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-inverse border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <>
                     <UserPlus className="w-4 h-4" />
@@ -246,7 +235,7 @@ export function TeamPage() {
 
         {/* --- Roster ------------------------------------------------------ */}
         <div className="lg:col-span-2">
-          <div className="bg-panel rounded-xl border border-line shadow-sm">
+          <div className="bg-panel rounded-xl border border-line shadow-panel">
             <div className="flex items-center justify-between px-5 py-4 border-b border-line">
               <div className="flex items-center gap-2">
                 <Users className="w-5 h-5 text-faint" />
