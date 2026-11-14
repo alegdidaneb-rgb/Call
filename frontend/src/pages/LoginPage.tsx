@@ -50,7 +50,7 @@ export function LoginPage() {
     setLoading(true);
     try {
       await signIn(email, password);
-      navigate("/dashboard");
+      navigate("/workspace");
     } catch (err: any) {
       setError(err.message ?? "Login failed");
     } finally {

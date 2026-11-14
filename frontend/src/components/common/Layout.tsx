@@ -87,6 +87,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   // Never leave the mobile drawer covering the page an agent just navigated to.
   const { pathname } = useLocation();
+
+  /**
+   * Screens that manage their own height and scrolling.
+   *
+   * The calling workspace is a set of independently scrolling panes filling the
+   * viewport. Giving it the shell's padding and page scroll produces a second
+   * scrollbar and, worse, a percentage-height pane that cannot resolve against a
+   * parent with no definite height.
+   */
+  const isFullBleed = pathname === "/workspace";
   useEffect(() => {
     setSidebarOpen(false);
   }, [pathname]);
@@ -120,7 +130,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         }`}
       >
         <div className="flex h-14 items-center justify-between border-b border-line px-4">
-          <NavLink to="/dashboard" className="flex items-center gap-2.5">
+          <NavLink to="/workspace" className="flex items-center gap-2.5">
             <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-inverse">
               <Phone className="h-3.5 w-3.5" />
             </span>
@@ -255,7 +265,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6">{children}</main>
+        <main className={isFullBleed ? "flex min-h-0 flex-1 flex-col overflow-hidden" : "flex-1 overflow-y-auto p-4 lg:p-6"}>
+          {children}
+        </main>
       </div>
 
       {paletteOpen && (

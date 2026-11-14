@@ -8,6 +8,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+- A calling workspace at `/workspace`: the lead queue, the lead being called and
+  the call controls in three independently scrolling panes, so working a list
+  never costs a navigation. It is the landing route now, because it is the screen
+  the job is done on
+- The workspace is keyboard-driven end to end — `j`/`k` or arrows to move, `d` to
+  dial or end, `m` mute, `h` hold, `1`–`7` to record an outcome, `i`/`c`/`x`/`v`
+  to set a status, `f` to filter, `?` for the list — and a shortcut overlay that
+  is generated from the same definitions the bindings come from, so it cannot
+  drift out of date
+- Disposition codes with their consequences attached (`lib/outcomes.ts`): each one
+  knows the lead status it implies, whether it advances the queue, and its hotkey
+- A rule that stops a disposition walking a lead backwards, and treats
+  `do_not_contact` and `converted` as terminal. Re-dialling somebody who asked you
+  to stop is a compliance problem, not a UI bug
+- Selection that follows position rather than identity: when the lead you are on
+  leaves the queue, you land on the row that took its place instead of the top of
+  a four-thousand-lead list
+- Hand-rolled chart primitives — sparkline, columns and a donut — reading their
+  colours from the same CSS variables as everything else, so they follow a theme
+  switch without a re-mount. No charting dependency was added
+- A lead data grid: sortable on every column, windowed so a large list stays
+  usable, multi-select with shift-click ranges, bulk status change, bulk
+  do-not-contact, bulk delete, and inline status editing
+- CSV export, which the previous Leads page had as an imported icon with no
+  handler. It honours the current filters, or the selection when there is one, and
+  quotes to RFC 4180 so free-text notes containing commas survive Excel
+- Script editing: `call_scripts` can now be created, edited, deleted and attached
+  to a campaign, with an objections editor. The workspace shows the script
+  resolved against the lead's campaign beside the dial button
+- A motion system: five keyframes, one spring easing token, and short durations
+  throughout. `prefers-reduced-motion` collapses all of it with a blanket rule, so
+  no component can forget to opt out
+- Loading skeletons that match the shape of what they replace, and an `EmptyState`
+  that distinguishes "no data yet", "your filters are too narrow" and "the fetch
+  failed" — three situations with three different remedies
+- `lib/keys.ts`, which coordinates overlays so a keystroke cannot reach two
+  listeners. Without it, pressing `d` behind a "delete this lead?" dialog would
+  have dialled the lead
+- Bulk CSV import as one statement instead of one round trip per row, each of
+  which refetched the whole list
+
 - A design-token layer in `src/index.css`: every colour is an RGB triplet on a
   CSS variable, so one token serves as a solid fill, a tinted chip background
   and a hairline border through Tailwind's opacity modifiers
@@ -24,24 +66,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   administrators
 - `vite.config.ts` now splits React into its own chunk, so a UI change no longer
   invalidates ~165 kB in every agent's cache
-
-### Changed
-- Navigation is grouped into Work, Manage and Admin instead of one flat list of
-  eight entries
-- The accent is an indigo-violet rather than the framework's stock blue, and the
-  default Tailwind palette is now removed from the config entirely so off-token
-  colours cannot creep back in one utility at a time
-- Inter is actually loaded; it was declared in the theme but never fetched, so
-  every surface was rendering in the system fallback
-- JetBrains Mono for phone numbers, timers and other digits, with tabular
-  figures so they do not jitter as they change
-- The stock Vite favicon is replaced with an application mark
-
-### Removed
-- The header search input, which rendered and accepted typing but was never
-  connected to anything, and the notification bell, which carried a hardcoded
-  unread dot for a notification system that does not exist. Both are superseded
-  by the command palette
 - A working browser softphone: SIP registration over WSS, WebRTC audio, mute,
   hold, DTMF, inbound call handling, and one call at a time
 - `sip_accounts` in both the Supabase and SQLite schemas, with row-level security
@@ -85,6 +109,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Data seeder with sample leads
 
 ### Changed
+
+- The dashboard measures a window the operator chooses (7, 14 or 30 days) and
+  compares it with the window before it, rather than printing six lifetime totals.
+  Call volume, connect rate, talk time and queue remaining, each with a trend;
+  outcome mix; pipeline; per-campaign performance; recent activity
+- The Leads page is a grid rather than a `<table>` with padding
+- Toasts are themed from the tokens. `react-hot-toast` was mounted with its default
+  styling, which is a white pill with dark text — in a dark app that read as a
+  browser artefact that had escaped the design system
+- The confirm dialog uses tokens instead of `bg-black/50` and `text-white`, which
+  are absolute and so looked identical in both themes and matched neither. It now
+  closes on Escape, announces itself as a dialog, and registers as an overlay
+- The call bar rises into place, its hang-up button has a hover state that does
+  something (`hover:bg-danger` on `bg-danger` did nothing), and clicking it opens
+  the workspace to disposition the call
+- The softphone's outcome `<select>` is superseded in the workspace by buttons that
+  show their hotkey and what they will do
+
+- Navigation is grouped into Work, Manage and Admin instead of one flat list of
+  eight entries
+- The accent is an indigo-violet rather than the framework's stock blue, and the
+  default Tailwind palette is now removed from the config entirely so off-token
+  colours cannot creep back in one utility at a time
+- Inter is actually loaded; it was declared in the theme but never fetched, so
+  every surface was rendering in the system fallback
+- JetBrains Mono for phone numbers, timers and other digits, with tabular
+  figures so they do not jitter as they change
+- The stock Vite favicon is replaced with an application mark
 - Numbers are dialled in international format, derived from the lead's country.
   A local number whose country shares a dialling code is reported to the operator
   rather than guessed at
@@ -106,6 +158,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated hooks to support multiple data providers
 
 ### Removed
+
+- The hardcoded `SAMPLE_SCRIPT`, which was rendered by both the Scripts page and
+  the script viewer out of `useState`. An agent following it was reading a script
+  no administrator had written and could not change — worse than no script panel,
+  because it looked authoritative
+- A `slide-in-right` animation that was declared in the config and used nowhere.
+  Tailwind only emits keyframes for animations in use, so it was generating nothing
+  and only implying that something depended on it
+
+- The header search input, which rendered and accepted typing but was never
+  connected to anything, and the notification bell, which carried a hardcoded
+  unread dot for a notification system that does not exist. Both are superseded
+  by the command palette
 - **The simulated call.** With no credentials configured the softphone animated
   "Connecting -> Ringing -> Connected" and then logged an `answered` call with a
   fabricated duration for a call that had never been placed. SIP errors were
@@ -119,6 +184,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   this project
 
 ### Fixed
+
+- `call_count` and `last_called_at` are written from the workspace. They were
+  rendered on the lead page and only ever written from there, so a lead dialled
+  from anywhere else stayed at "0 calls / Never" however many attempts it had had
+- Notes taken with no call are stored on the lead instead of being discarded: they
+  previously had nowhere to go, because the only write path was the call log
+- The do-not-contact flag and the `do_not_contact` status are set together. They are
+  two representations of one decision, and leaving them out of step meant a lead
+  stayed out of the queue while still looking callable in the list
+- A failed inline status change reverts the control, rather than leaving it showing
+  a value that was never written
+
 - No audio element was ever attached to a call, so even correct credentials would
   have connected in silence
 - No STUN servers were configured — `SIP_PRESETS` defined them and nothing read

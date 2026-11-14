@@ -8,6 +8,7 @@ import type { AppRole } from "@/types/app";
 
 const LoginPage = React.lazy(() => import("@/pages/LoginPage").then((m) => ({ default: m.LoginPage })));
 const SetupPage = React.lazy(() => import("@/pages/SetupPage").then((m) => ({ default: m.SetupPage })));
+const WorkspacePage = React.lazy(() => import("@/pages/WorkspacePage"));
 const DashboardPage = React.lazy(() => import("@/pages/DashboardPage").then((m) => ({ default: m.DashboardPage })));
 const LeadsPage = React.lazy(() => import("@/pages/LeadsPage").then((m) => ({ default: m.LeadsPage })));
 const LeadDetailPage = React.lazy(() => import("@/pages/LeadDetailPage").then((m) => ({ default: m.LeadDetailPage })));
@@ -94,7 +95,7 @@ function RequireRole({ roles, children }: { roles: AppRole[]; children: React.Re
     return <PageSpinner />;
   }
   if (!user || !roles.includes(user.role)) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/workspace" replace />;
   }
   return <>{children}</>;
 }
@@ -111,7 +112,8 @@ function AppRoutes() {
             <Layout>
               <Suspense fallback={<PageSpinner />}>
                 <Routes>
-                  <Route index element={<Navigate to="/dashboard" replace />} />
+                  <Route index element={<Navigate to="/workspace" replace />} />
+                  <Route path="workspace" element={<WorkspacePage />} />
                   <Route path="dashboard" element={<DashboardPage />} />
                   <Route path="leads" element={<LeadsPage />} />
                   <Route path="leads/:leadId" element={<LeadDetailPage />} />

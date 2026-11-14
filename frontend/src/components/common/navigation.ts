@@ -2,6 +2,7 @@ import type { ComponentType } from "react";
 import {
   Clock,
   FileText,
+  Headset,
   LayoutDashboard,
   PhoneCall,
   Shield,
@@ -27,6 +28,9 @@ export interface NavItem {
  * manage the campaigns and scripts that feed it, then administer the system.
  */
 export const NAV_ITEMS: NavItem[] = [
+  // The workspace comes first because it is the screen the job is done on;
+  // everything below it is preparation or review.
+  { to: "/workspace", label: "Workspace", icon: Headset, group: "Work" },
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, group: "Work" },
   { to: "/leads", label: "Leads", icon: Users, group: "Work" },
   { to: "/history", label: "Call History", icon: Clock, group: "Work" },
