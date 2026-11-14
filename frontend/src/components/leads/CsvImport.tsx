@@ -1,0 +1,175 @@
+import React, { useState, useCallback } from "react";
+import { X, Upload } from "lucide-react";
+import Papa from "papaparse";
+
+interface CsvRow {
+  first_name?: string;
+  last_name?: string;
+  company?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  /** ISO 3166-1 alpha-2 code, e.g. "GB". Lowercase and full names are accepted. */
+  country?: string;
+  source?: string;
+  status?: string;
+  [key: string]: string | undefined;
+}
+
+interface CsvImportProps {
+  onClose: () => void;
+  onImport: (rows: CsvRow[]) => Promise<void>;
+}
+
+const csvColumns = [
+  "first_name", "last_name", "company", "phone", "email",
+  "website", "address", "city", "state", "zip", "country", "source", "status",
+];
+
+export function CsvImport({ onClose, onImport }: CsvImportProps) {
+  const [file, setFile] = useState<File | null>(null);
+  const [mapping, setMapping] = useState<Record<string, string | undefined>>({});
+  const [parsedData, setParsedData] = useState<CsvRow[]>([]);
+  const [headers, setHeaders] = useState<string[]>([]);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setFile(f);
+    setError("");
+    setParsedData([]);
+    setHeaders([]);
+    setMapping({});
+
+    Papa.parse<CsvRow>(f, {
+      header: true,
+      skipEmptyLines: true,
+      complete(results) {
+        const h = results.meta.fields ?? [];
+        setHeaders(h);
+        setParsedData(results.data as CsvRow[]);
+      },
+      error(err: Error) {
+        setError(`Failed to parse CSV: ${err.message}`);
+      },
+    });
+  }, []);
+
+  async function handleImport() {
+    if (!parsedData.length) return;
+    setLoading(true);
+    try {
+      const mapped = parsedData.map((row) => {
+        const mappedRow: CsvRow = {};
+        csvColumns.forEach((col) => {
+          const sourceKey = mapping[col];
+          if (sourceKey && row[sourceKey] !== undefined) {
+            mappedRow[col] = row[sourceKey];
+          }
+        });
+        return mappedRow;
+      });
+      await onImport(mapped);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-panel rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-5 border-b border-line">
+          <h2 className="text-lg font-semibold text-ink">Import CSV</h2>
+          <button onClick={onClose} className="text-faint hover:text-muted">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="p-5 space-y-4">
+          {!parsedData.length ? (
+            <div>
+              <label className="block text-sm font-medium text-ink mb-2">Select CSV File</label>
+              <div className="border-2 border-dashed border-line-strong rounded-lg p-8 text-center hover:border-accent/40 transition cursor-pointer">
+                <Upload className="w-8 h-8 text-faint mx-auto mb-2" />
+                <p className="text-sm text-muted">Click to select or drag and drop a CSV file</p>
+                <p className="text-xs text-faint mt-1">Supports quoted fields, commas, and multi-line cells</p>
+                <input
+                  type="file"
+                  accept=".csv,.tsv,.txt"
+                  onChange={handleFileChange}
+                  className="hidden"
+                  id="csv-upload"
+                />
+                <label
+                  htmlFor="csv-upload"
+                  className="mt-3 inline-block px-4 py-2 text-sm font-medium text-accent bg-accent/12 rounded-lg hover:bg-accent/12 cursor-pointer transition"
+                >
+                  Choose File
+                </label>
+              </div>
+              {error && <p className="text-sm text-danger mt-2">{error}</p>}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-sm text-muted">{parsedData.length} rows parsed. Map CSV columns to database fields.</p>
+              <div className="space-y-2">
+                {csvColumns.map((col) => {
+                  const csvOptions = ["— None —", ...headers];
+                  return (
+                    <div key={col} className="flex items-center gap-3">
+                      <span className="w-32 text-sm font-medium text-ink capitalize">{col.replace(/_/g, " ")}</span>
+                      <select
+                        value={mapping[col] ?? ""}
+                        onChange={(e) => setMapping((prev) => ({ ...prev, [col]: e.target.value || undefined }))}
+                        className="flex-1 px-3 py-1.5 border border-line-strong rounded-lg text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none bg-panel"
+                      >
+                        {csvOptions.map((opt) => (
+                          <option key={opt} value={opt === "— None —" ? "" : opt}>{opt}</option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="max-h-40 overflow-y-auto border border-line rounded-lg">
+                <table className="w-full text-xs">
+                  <thead className="bg-app sticky top-0">
+                    <tr>
+                      {headers.slice(0, 5).map((h) => (
+                        <th key={h} className="px-3 py-2 text-left font-medium text-muted">{h}</th>
+                      ))}
+                      {headers.length > 5 && <th className="px-3 py-2 text-left font-medium text-muted">...</th>}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line">
+                    {parsedData.slice(0, 3).map((row, i) => (
+                      <tr key={i}>
+                        {headers.slice(0, 5).map((h, j) => (
+                          <td key={j} className="px-3 py-1.5 text-muted truncate max-w-[120px]">{row[h] ?? "—"}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex justify-between">
+                <button type="button" onClick={() => { setParsedData([]); setMapping({}); }} className="px-4 py-2 text-sm font-medium text-ink bg-hover hover:bg-line rounded-lg transition">Change File</button>
+                <div className="flex gap-3">
+                  <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-ink bg-hover hover:bg-line rounded-lg transition">Cancel</button>
+                  <button type="button" onClick={handleImport} disabled={loading} className="px-4 py-2 text-sm font-medium text-white bg-accent hover:bg-accent-strong disabled:bg-accent rounded-lg transition">
+                    {loading ? "Importing..." : "Import"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

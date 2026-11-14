@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" data-density="comfortable" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cold Dialer</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <script>
+      // Applied before first paint so a returning agent never sees the wrong
+      // theme flash. Mirrors the defaults in src/lib/preferences.ts.
+      (function () {
+        try {
+          var stored = JSON.parse(localStorage.getItem("cold-dialer-prefs") || "{}");
+          var theme = stored.theme || "dark";
+          if (theme === "system") {
+            theme = window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+          }
+          var root = document.documentElement;
+          root.setAttribute("data-theme", theme);
+          root.classList.toggle("dark", theme === "dark");
+          root.setAttribute("data-density", stored.density || "comfortable");
+        } catch (err) {
+          /* a corrupt entry must not stop the app from booting */
+        }
+      })();
+    </script>
+  </head>
+  <body class="bg-app">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

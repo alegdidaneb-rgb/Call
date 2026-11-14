@@ -1,0 +1,32 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    ports:
+      - "4000:4000"
+    volumes:
+      - backend-data:/app/data
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      # `${VAR:?message}` makes compose fail fast instead of booting the API with
+      # a published placeholder secret that anyone could use to forge tokens.
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set, e.g. `openssl rand -hex 32`}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
+      - DATABASE_PATH=/app/data/cold-dialer.db
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  backend-data:
