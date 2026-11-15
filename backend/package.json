@@ -13,7 +13,8 @@
     "lint": "tsc --noEmit -p tsconfig.lint.json && npm run check:async && npm run check:sql",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.lint.json",
     "check:async": "tsx scripts/check-async-db.ts",
-    "check:sql": "tsx scripts/check-sql-rewriter.ts && tsx scripts/check-sql-placeholders.ts"
+    "check:sql": "tsx scripts/check-sql-rewriter.ts && tsx scripts/check-sql-placeholders.ts",
+    "check:schema": "tsx scripts/check-schema-idempotent.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

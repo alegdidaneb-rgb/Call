@@ -1,4 +1,4 @@
-import db from "./database.js";
+import db, { ensureSchema } from "./database.js";
 import { closePool } from "./pool.js";
 import { v4 as uuid } from "uuid";
 import bcrypt from "bcryptjs";
@@ -55,6 +55,20 @@ function randomPhone(): string {
 
 async function seed() {
   console.log("Seeding database...");
+
+  /**
+   * Create the tables before filling them.
+   *
+   * The server entrypoints get this from `app.ts`, which calls `ensureSchema()` at
+   * import. This script imports the database directly and so never went through
+   * that path — harmless under SQLite, where the schema was applied synchronously
+   * at import, but after the port nothing created the tables and the first INSERT
+   * failed with `relation "profiles" does not exist` on any fresh database.
+   *
+   * It also means seeding an empty database now works as one command, which is what
+   * `docker compose` users and CI both expect.
+   */
+  await ensureSchema();
 
   const userId = uuid();
 

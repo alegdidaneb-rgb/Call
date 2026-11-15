@@ -11,7 +11,11 @@
     "This config drops rootDir and adds api/ so `npm run lint` proves both",
     "entrypoints compile. It emits nothing; the build still uses tsconfig.json.",
     "Without it, the handler that actually runs in production would be the one part",
-    "of the backend no check ever looked at."
+    "of the backend no check ever looked at.",
+    "",
+    "scripts/ is included for the same reason. Those files run in CI as `npm run",
+    "check:*`, so a type error in one is a broken pipeline rather than a broken",
+    "build — and nothing else compiled them."
   ],
   "extends": "./tsconfig.json",
   "compilerOptions": {
@@ -19,5 +23,5 @@
     "noEmit": true,
     "declaration": false
   },
-  "include": ["src/**/*", "api/**/*"]
+  "include": ["src/**/*", "api/**/*", "scripts/**/*"]
 }
