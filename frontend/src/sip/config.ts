@@ -1,10 +1,17 @@
-export type SipProvider = "signalwire" | "telnyx" | "twilio" | "bitcall" | "custom";
+export type SipProvider =
+  | "signalwire"
+  | "telnyx"
+  | "twilio"
+  | "bitcall"
+  | "freeswitch"
+  | "custom";
 
 export const SIP_PROVIDERS: SipProvider[] = [
   "signalwire",
   "telnyx",
   "twilio",
   "bitcall",
+  "freeswitch",
   "custom",
 ];
 
@@ -12,6 +19,18 @@ export interface SipPreset {
   label: string;
   /** Port used only to derive a WSS URL when the administrator leaves it blank. */
   wsPort: number;
+  /**
+   * Path appended to that derived URL, for the servers that do not answer at the
+   * root.
+   *
+   * Asterisk serves SIP over WebSocket at `/ws`, so a derived `wss://host:8089`
+   * reaches a listener that speaks something else. FreeSWITCH (7443) and Telnyx
+   * answer at the root and need nothing here. This existed as a contradiction
+   * rather than a field: the `custom` preset's own example showed `/ws` while
+   * `deriveWsUrl` omitted it, so the form auto-filled an address that the preset's
+   * own documentation said was wrong.
+   */
+  wsPath?: string;
   /** Seconds between registration refreshes. */
   registrationInterval: number;
   stunServers: string[];
@@ -103,9 +122,43 @@ export const SIP_PRESETS: Record<SipProvider, SipPreset> = {
       wsUrl: "wss://sip.example.com",
     },
   },
+  freeswitch: {
+    label: "FreeSWITCH (your own PBX)",
+    /**
+     * Verified against the vanilla configuration FreeSWITCH ships, not against a
+     * guide: `conf/vanilla/sip_profiles/internal.xml` binds `ws-binding :5066`
+     * and `wss-binding :7443`, both uncommented and live out of the box, and
+     * `conf/vanilla/vars.xml` already sets `global_codec_prefs` to
+     * `OPUS,G722,PCMU,PCMA,H264,VP8` — so OPUS, which is what a browser will
+     * offer first, needs no codec configuration.
+     *
+     * The reason this preset exists separately from `custom`: `custom` derives
+     * 8089, which is Asterisk's HTTP/WSS port. An operator who picked "Other
+     * (Asterisk, FreeSWITCH, 3CX)" for a FreeSWITCH host and left the field blank
+     * was pointed at a port nothing listens on, and got a transport failure that
+     * said nothing about the port being the problem.
+     */
+    wsPort: 7443,
+    registrationInterval: 600,
+    stunServers: DEFAULT_STUN_SERVERS,
+    // FreeSWITCH answers SIP over WebSocket itself. Unlike Bitcall, there is no
+    // separate gateway to install in front of it.
+    browserReady: true,
+    turnNote:
+      "FreeSWITCH has no TURN server of its own; run coturn beside it and enter that host here. Without a relay, an agent behind a symmetric NAT or a corporate firewall connects, hears nothing in one or both directions, and the call is still logged as answered with a real duration. The audio-path check on this page reports whether a relay candidate actually arrived. Two FreeSWITCH settings also decide this: `external_rtp_ip` and `external_sip_ip` in vars.xml default to `stun:stun.freeswitch.org`, and must name the public address or media goes to the wrong place. See docs/freeswitch-webrtc.md.",
+    example: {
+      sipUri: "sip:1000@pbx.example.com",
+      wsUrl: "wss://pbx.example.com:7443",
+    },
+  },
   custom: {
-    label: "Other (Asterisk, FreeSWITCH, 3CX, ...)",
+    // FreeSWITCH has its own preset above, with the port it actually listens on.
+    // What is left here is anything that answers SIP over WebSocket and is not
+    // one of the named providers — so the example stays Asterisk-shaped, because
+    // 8089 and the `/ws` path are Asterisk's.
+    label: "Other PBX or gateway (Asterisk, 3CX, ...)",
     wsPort: 8089,
+    wsPath: "/ws",
     registrationInterval: 600,
     stunServers: DEFAULT_STUN_SERVERS,
     // True in the sense that whatever the operator names here is expected to
@@ -200,7 +253,7 @@ export function deriveWsUrl(provider: SipProvider, domain: string): string {
   // name the PBX or gateway the browser should actually talk to.
   if (!preset.browserReady) return "";
   const port = preset.wsPort === 443 ? "" : `:${preset.wsPort}`;
-  return `wss://${domain}${port}`;
+  return `wss://${domain}${port}${preset.wsPath ?? ""}`;
 }
 
 export function resolveStunUrls(provider: SipProvider, explicit?: string[] | null): string[] {

@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **FreeSWITCH is a named SIP provider** rather than something to file under
+  "Other", with its own preset deriving `wss://<domain>:7443` — migration 008
+  widens the `sip_accounts.provider` check to accept it. The generic entry derives
+  8089, which is Asterisk's HTTP/WSS port, so picking it for a FreeSWITCH host and
+  leaving the WebSocket field blank pointed the browser at a port with nothing
+  listening and reported it as a transport failure
+- `docs/freeswitch-webrtc.md`, a runbook for running FreeSWITCH as the PBX for
+  nothing: free hosting options and their real caveats, the four settings that
+  decide whether a browser can register, the `wss.pem` and Let's Encrypt renewal
+  trap, the dialplan hook this app needs, and the built-in test destinations that
+  verify the whole media path without a paid call
 - **Administrators can assign leads to agents.** The Lead list grows an *Owner*
   column with a picker in each row, an owner filter, and *Assign to…* in the bulk
   bar for a selection of any size; the lead detail page grows an Assignment card.
@@ -349,6 +360,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Choosing the generic **"Other PBX"** provider auto-filled a WebSocket URL that
+  Asterisk does not answer. `deriveWsUrl` built `wss://host:8089`, but Asterisk
+  serves SIP over WebSocket at `/ws` — and the preset's own example said
+  `wss://host:8089/ws`, so the form contradicted the documentation printed beside
+  it. Presets can now carry a `wsPath`, and a check asserts that every
+  browser-ready preset's example matches what its own derivation produces, which is
+  how the contradiction was found
 - A self-hosted backend created before TURN support **refused every `sip_accounts`
   write** with `column "turn_urls" does not exist`. `ensureSchema()` builds the
   schema with `CREATE TABLE IF NOT EXISTS`, which never alters a table that already

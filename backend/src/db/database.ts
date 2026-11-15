@@ -144,7 +144,9 @@ const SCHEMA = `
     user_id text REFERENCES profiles(id) ON DELETE CASCADE,
     label text,
     provider text NOT NULL DEFAULT 'custom'
-      CHECK (provider IN ('signalwire', 'telnyx', 'twilio', 'bitcall', 'custom')),
+      CHECK (provider IN (
+        'signalwire', 'telnyx', 'twilio', 'bitcall', 'freeswitch', 'custom'
+      )),
     sip_uri text NOT NULL,
     -- Stored in plaintext, as it is in the Supabase deployment: the browser needs
     -- it to register a SIP session, so it cannot be hashed. Documented in
@@ -245,16 +247,20 @@ const SCHEMA = `
         );
     END IF;
 
-    -- 'bitcall' is a named provider preset in the app, so a table built before it
-    -- has to start accepting it.
+    -- 'bitcall' and 'freeswitch' are named provider presets in the app, so a table
+    -- built before either has to start accepting it. Both are tested rather than
+    -- just the newest: a database can be missing one and not the other, depending
+    -- on which revision created it, and testing only 'freeswitch' would leave a
+    -- table that never received 'bitcall' rejecting it forever.
     IF EXISTS (SELECT 1 FROM pg_constraint c
                 WHERE c.conname = 'sip_accounts_provider_check'
                   AND c.conrelid = 'sip_accounts'::regclass
-                  AND pg_get_constraintdef(c.oid) NOT LIKE '%bitcall%') THEN
+                  AND (pg_get_constraintdef(c.oid) NOT LIKE '%bitcall%'
+                    OR pg_get_constraintdef(c.oid) NOT LIKE '%freeswitch%')) THEN
       ALTER TABLE sip_accounts DROP CONSTRAINT sip_accounts_provider_check;
       ALTER TABLE sip_accounts
         ADD CONSTRAINT sip_accounts_provider_check CHECK (
-          provider IN ('signalwire', 'telnyx', 'twilio', 'bitcall', 'custom')
+          provider IN ('signalwire', 'telnyx', 'twilio', 'bitcall', 'freeswitch', 'custom')
         );
     END IF;
   END

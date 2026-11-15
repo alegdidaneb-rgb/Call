@@ -12,7 +12,14 @@ import {
 const router = Router();
 router.use(authMiddleware, requireProvisioned);
 
-const PROVIDERS = ["signalwire", "telnyx", "twilio", "bitcall", "custom"] as const;
+const PROVIDERS = [
+  "signalwire",
+  "telnyx",
+  "twilio",
+  "bitcall",
+  "freeswitch",
+  "custom",
+] as const;
 
 const DEFAULT_STUN = ["stun:stun.l.google.com:19302"];
 
