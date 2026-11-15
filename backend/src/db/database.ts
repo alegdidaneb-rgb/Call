@@ -203,6 +203,62 @@ const SCHEMA = `
   -- distinct in a unique index, so the sentinel is what makes this enforceable.
   CREATE UNIQUE INDEX IF NOT EXISTS idx_sip_accounts_owner
     ON sip_accounts(COALESCE(user_id, '__trunk_default__'));
+
+  -- Repair a table that already existed.
+  --
+  -- CREATE TABLE IF NOT EXISTS never alters anything, so a database created before
+  -- a column was added keeps running with the old shape while the routes above
+  -- reference the new one. That is not hypothetical: the deployed API's database
+  -- was built before TURN support and then refused every sip_accounts write with
+  -- "column turn_urls does not exist", because the only thing that creates the
+  -- schema had already decided the table was fine.
+  --
+  -- The guarded block is the same convention supabase/migrations/006_sip_turn.sql
+  -- uses, so both deployments converge on one shape from two different starting
+  -- points. Guarded rather than unconditional because this runs on every cold
+  -- start, and a bare ALTER TABLE ADD COLUMN would fail the second time.
+  DO $repair$
+  BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'sip_accounts'
+                      AND column_name = 'turn_urls') THEN
+      ALTER TABLE sip_accounts
+        ADD COLUMN turn_urls text NOT NULL DEFAULT '[]',
+        ADD COLUMN turn_username text,
+        ADD COLUMN turn_credential text;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                    WHERE conname = 'sip_accounts_turn_credential_pairs') THEN
+      ALTER TABLE sip_accounts
+        ADD CONSTRAINT sip_accounts_turn_credential_pairs CHECK (
+          (turn_username IS NULL AND turn_credential IS NULL)
+          OR (COALESCE(BTRIM(turn_username), '') <> '' AND COALESCE(BTRIM(turn_credential), '') <> '')
+        );
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                    WHERE conname = 'sip_accounts_turn_needs_server') THEN
+      ALTER TABLE sip_accounts
+        ADD CONSTRAINT sip_accounts_turn_needs_server CHECK (
+          turn_username IS NULL OR BTRIM(turn_urls) NOT IN ('[]', '', 'null')
+        );
+    END IF;
+
+    -- 'bitcall' is a named provider preset in the app, so a table built before it
+    -- has to start accepting it.
+    IF EXISTS (SELECT 1 FROM pg_constraint c
+                WHERE c.conname = 'sip_accounts_provider_check'
+                  AND c.conrelid = 'sip_accounts'::regclass
+                  AND pg_get_constraintdef(c.oid) NOT LIKE '%bitcall%') THEN
+      ALTER TABLE sip_accounts DROP CONSTRAINT sip_accounts_provider_check;
+      ALTER TABLE sip_accounts
+        ADD CONSTRAINT sip_accounts_provider_check CHECK (
+          provider IN ('signalwire', 'telnyx', 'twilio', 'bitcall', 'custom')
+        );
+    END IF;
+  END
+  $repair$;
 `;
 
 /**

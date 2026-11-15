@@ -349,6 +349,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A self-hosted backend created before TURN support **refused every `sip_accounts`
+  write** with `column "turn_urls" does not exist`. `ensureSchema()` builds the
+  schema with `CREATE TABLE IF NOT EXISTS`, which never alters a table that already
+  exists — so the routes referenced columns the only thing that creates the schema
+  had already decided were unnecessary. It now runs a guarded repair block that
+  adds the missing columns and constraints and widens the `provider` check to
+  accept `bitcall`, which a table built before that preset would otherwise reject.
+  Guarded rather than unconditional because it runs on every cold start, and a bare
+  `ALTER TABLE ADD COLUMN` would fail the second time
 - Administrators had **no way to assign a lead** to an agent. `leads.assigned_to`
   has existed since migration 001, the policies permitted writing it, and the API
   accepted it — but no `.tsx` file in the frontend referenced the column, so there
