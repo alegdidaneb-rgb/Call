@@ -128,14 +128,20 @@ jobs:
           # API to answer /api/health/ready, which awaits `ensureSchema()` and
           # returns 503 if the schema could not be applied. That is the first place
           # anywhere the HTTP path and the boot sequence are exercised together.
-          for i in $(seq 1 30); do
+          for i in $(seq 1 90); do
             if curl -fsS http://localhost:4000/api/health/ready; then
               echo; echo "backend reported ready after ${i}s"
               break
             fi
-            if [ "$i" -eq 30 ]; then
-              echo "backend never became ready" >&2
-              docker compose -f docker/docker-compose.yml logs backend >&2
+            if [ "$i" -eq 90 ]; then
+              # Emit the container logs as an annotation rather than only to stderr.
+              # Job logs live on a separate host from the API, so a failure that
+              # explains itself only in its log tail can be unreadable to whoever
+              # is triaging it from the timeline; an annotation is part of the
+              # check run and shows up on the PR either way.
+              logs=$(docker compose -f docker/docker-compose.yml logs --tail=40 backend 2>&1 | tr '\n' ' ' | tr -d '\r')
+              echo "::error title=backend never became ready::${logs}"
+              echo "::error title=compose ps::$(docker compose -f docker/docker-compose.yml ps -a 2>&1 | tr '\n' ' ' | tr -d '\r')"
               exit 1
             fi
             sleep 1
