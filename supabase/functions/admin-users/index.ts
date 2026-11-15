@@ -88,16 +88,48 @@ function syntheticEmail(username: string): string {
 
 /**
  * Origins allowed to call this function from a browser. Supabase edge functions
- * do not add CORS headers themselves, and a wildcard here would let any site
- * drive an administrator's session against this endpoint.
+ * do not add CORS headers themselves, so this is the only thing standing between
+ * this endpoint and some other site driving an administrator's session against it.
+ *
+ * A literal list cannot carry the whole job. Vercel mints a new host per branch
+ * and per deployment — `cold-dialer-git-<branch>-algedi.vercel.app`,
+ * `cold-dialer-<hash>-algedi.vercel.app` — so under a list-only rule every branch
+ * needs a code change before it can be tested, and the list grows one dead entry
+ * per merged PR. (It already had one: a branch alias from a PR merged weeks ago,
+ * and no entry for the branch that replaced it.)
+ *
+ * So this project's own Vercel hosts are matched by pattern instead of enumerated.
+ * That is safe in a way a generic wildcard is not: `cold-dialer-*.vercel.app` can
+ * only ever resolve to this project, because Vercel subdomains are globally
+ * unique. `*.vercel.app` would not be acceptable here; this prefix is.
+ *
+ * Anything else — a sandbox preview, a staging domain — belongs in the
+ * `ADMIN_USERS_ALLOWED_ORIGINS` secret, comma-separated, so it can be granted
+ * without a redeploy. Deliberately NOT a wildcard over a shared domain: allowing
+ * `*.e2b.app` would let every other sandbox on that platform call this function
+ * with an administrator's token.
  */
-const ALLOWED_ORIGINS = new Set([
-  "https://cold-dialer-algedi.vercel.app",
-  "https://cold-dialer-one.vercel.app",
-  "https://cold-dialer-git-arena-2b483083-call-algedi.vercel.app",
-  "http://localhost:3000",
-  "http://localhost:5173",
-]);
+const PROJECT_ORIGIN_PATTERN = /^https:\/\/cold-dialer(-[a-z0-9-]+)?\.vercel\.app$/;
+
+const LOCAL_ORIGINS = new Set(["http://localhost:3000", "http://localhost:5173"]);
+
+/** Trailing slashes are stripped so a copy-pasted URL with one still matches. */
+const CONFIGURED_ORIGINS = new Set(
+  (Deno.env.get("ADMIN_USERS_ALLOWED_ORIGINS") ?? "")
+    .split(",")
+    .map((origin) => origin.trim().replace(/\/+$/, ""))
+    .filter(Boolean)
+);
+
+function isAllowedOrigin(origin: string): boolean {
+  if (!origin) return false;
+  const value = origin.replace(/\/+$/, "");
+  return (
+    LOCAL_ORIGINS.has(value) ||
+    CONFIGURED_ORIGINS.has(value) ||
+    PROJECT_ORIGIN_PATTERN.test(value)
+  );
+}
 
 function corsHeaders(req: Request): Record<string, string> {
   const origin = req.headers.get("origin") ?? "";
@@ -107,7 +139,7 @@ function corsHeaders(req: Request): Record<string, string> {
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Vary": "Origin",
   };
-  if (ALLOWED_ORIGINS.has(origin)) {
+  if (isAllowedOrigin(origin)) {
     headers["Access-Control-Allow-Origin"] = origin;
   }
   return headers;
