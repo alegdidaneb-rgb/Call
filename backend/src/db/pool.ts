@@ -49,14 +49,45 @@ types.setTypeParser(OID_TIMESTAMPTZ, (value) => new Date(value).toISOString());
 types.setTypeParser(OID_INT8, (value) => Number.parseInt(value, 10));
 
 /**
- * `require` (the default) verifies the server certificate. `no-verify` accepts an
- * encrypted but unverified connection, for a self-hosted Postgres with a private
- * CA. `disable` turns TLS off and should only ever be used against a database on
- * the same machine.
+ * TLS to the database, using libpq's names so the variable means what an operator
+ * already expects it to mean.
+ *
+ *   disable      no TLS. Only for a database on the same machine or inside a
+ *                private compose network.
+ *   require      (default) encrypted, server certificate not verified. This is
+ *                what libpq's `sslmode=require` does and what managed providers
+ *                document — Supabase's own connection strings use it.
+ *   verify-full  encrypted and the certificate chain is verified.
+ *
+ * An earlier revision of this file had `require` verify the chain, which silently
+ * meant `verify-full` under a name that promised less. That is not a pedantic
+ * distinction: it makes the default stricter than every connection string in a
+ * provider's dashboard, so a deployment configured from documented instructions
+ * would fail to connect for a reason nothing in the error message would name.
+ *
+ * An unrecognised value is rejected rather than ignored. Falling back to a default
+ * here would mean a typo like `reqiure` quietly changing the security properties of
+ * the database connection.
  */
-const SSL_MODE = process.env.PGSSLMODE ?? "require";
-const SSL =
-  SSL_MODE === "disable" ? false : { rejectUnauthorized: SSL_MODE !== "no-verify" };
+const SSL_MODE = (process.env.PGSSLMODE ?? "require").trim().toLowerCase();
+
+const SSL = (() => {
+  switch (SSL_MODE) {
+    case "disable":
+      return false as const;
+    case "require":
+    case "prefer":
+    case "no-verify": // accepted as a synonym; `require` is the documented name
+      return { rejectUnauthorized: false };
+    case "verify-full":
+    case "verify-ca":
+      return { rejectUnauthorized: true };
+    default:
+      throw new Error(
+        `PGSSLMODE must be one of disable, require, verify-full (got "${SSL_MODE}")`
+      );
+  }
+})();
 
 /**
  * Deliberately small. On serverless each instance is short-lived and there can be
