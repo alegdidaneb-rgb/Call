@@ -1,8 +1,10 @@
 import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
-import { UserPlus, Users, Shield, AlertCircle, CheckCircle2 } from "lucide-react";
-import { createUser, listTeamMembers, type NewUserInput } from "@/lib/auth";
+import { UserPlus, Users, Shield, AlertCircle, CheckCircle2, KeyRound } from "lucide-react";
+import { createUser, listTeamMembers, type NewUserInput, type TeamMember } from "@/lib/auth";
+import { ResetPasswordDialog } from "@/components/team/ResetPasswordDialog";
+import { normaliseUsername, usernameProblem } from "@/lib/username";
 import { PasswordField } from "@/components/auth/PasswordField";
 import { passwordSchema } from "@/lib/passwordPolicy";
 import type { AppRole } from "@/types/app";
@@ -21,12 +23,21 @@ import { PageHeader } from "@/components/common/PageHeader";
 const newUserSchema = z
   .object({
     fullName: z.string().min(2, "Name must be at least 2 characters"),
-    email: z.string().trim().toLowerCase().email("Enter a valid email address"),
+    /**
+     * Validated by the same rules the database enforces, so the operator is told
+     * here rather than after a round trip. The server still decides.
+     */
+    username: z.string().superRefine((value, context) => {
+      const problem = usernameProblem(value);
+      if (problem) {
+        context.addIssue({ code: z.ZodIssueCode.custom, message: problem });
+      }
+    }),
     password: passwordSchema,
     role: z.enum(["admin", "manager", "agent"]),
   });
 
-type FieldErrors = Partial<Record<"fullName" | "email" | "password" | "role", string>>;
+type FieldErrors = Partial<Record<"fullName" | "username" | "password" | "role", string>>;
 
 const ROLE_OPTIONS: { value: AppRole; label: string; hint: string }[] = [
   { value: "agent", label: "Agent", hint: "Works their own leads and the unassigned pool" },
@@ -43,12 +54,14 @@ const roleBadge: Record<AppRole, string> = {
 export function TeamPage() {
   const queryClient = useQueryClient();
   const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
+  /** Whose password is being reset, or null when the dialog is closed. */
+  const [resetTarget, setResetTarget] = useState<TeamMember | null>(null);
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<AppRole>("agent");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
-  const [created, setCreated] = useState<{ email: string; role: AppRole } | null>(null);
+  const [created, setCreated] = useState<{ username: string; role: AppRole } | null>(null);
 
   const { data: members, isLoading, error } = useQuery({
     queryKey: ["team"],
@@ -58,10 +71,10 @@ export function TeamPage() {
   const createMutation = useMutation({
     mutationFn: (input: NewUserInput) => createUser(input),
     onSuccess: (user) => {
-      setCreated({ email: user.email ?? email, role: user.role });
+      setCreated({ username: user.username ?? username, role: user.role });
       setFormError(null);
       setFullName("");
-      setEmail("");
+      setUsername("");
       setPassword("");
       setRole("agent");
       setFieldErrors({});
@@ -78,7 +91,7 @@ export function TeamPage() {
     setFormError(null);
     setCreated(null);
 
-    const parsed = newUserSchema.safeParse({ fullName, email, password, role });
+    const parsed = newUserSchema.safeParse({ fullName, username, password, role });
     if (!parsed.success) {
       const next: FieldErrors = {};
       for (const issue of parsed.error.issues) {
@@ -90,7 +103,9 @@ export function TeamPage() {
     }
 
     setFieldErrors({});
-    createMutation.mutate(parsed.data);
+    // Normalise before sending so what the roster shows afterwards is exactly
+    // what was stored, rather than the capitalisation that happened to be typed.
+    createMutation.mutate({ ...parsed.data, username: normaliseUsername(parsed.data.username) });
   }
 
   /**
@@ -122,9 +137,9 @@ export function TeamPage() {
               <div className="mb-4 flex items-start gap-2 rounded-lg bg-success/12 border border-success/30 p-3 text-sm text-success">
                 <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>
-                  <strong className="font-semibold">{created.email}</strong> was created as{" "}
-                  {created.role}. They can sign in now with the password you set -- share it over a
-                  secure channel and ask them to change it.
+                  <strong className="font-semibold">{created.username}</strong> was created as{" "}
+                  {created.role}. They sign in with that username and the password you just set —
+                  hand both over over a secure channel, since nothing is sent by email.
                 </span>
               </div>
             )}
@@ -155,19 +170,28 @@ export function TeamPage() {
               </div>
 
               <div>
-                <label htmlFor="team-email" className="block text-sm font-medium text-ink mb-1">
-                  Email
+                <label htmlFor="team-username" className="block text-sm font-medium text-ink mb-1">
+                  Username
                 </label>
                 <input
-                  id="team-email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  id="team-username"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   autoComplete="off"
-                  className={inputClass(fieldErrors.email)}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  placeholder="marco"
+                  aria-invalid={Boolean(fieldErrors.username)}
+                  className={inputClass(fieldErrors.username)}
                 />
-                {fieldErrors.email && (
-                  <p className="text-xs text-danger mt-1">{fieldErrors.email}</p>
+                <p className="text-xs text-muted mt-1">
+                  What they type to sign in. Lowercase letters, numbers and . _ - , between 3 and 32
+                  characters. No email address is needed and none is sent.
+                </p>
+                {fieldErrors.username && (
+                  <p className="text-xs text-danger mt-1">{fieldErrors.username}</p>
                 )}
               </div>
 
@@ -258,10 +282,13 @@ export function TeamPage() {
                   <thead>
                     <tr className="text-left text-xs font-medium text-muted uppercase tracking-wider border-b border-line">
                       <th className="px-5 py-3">Name</th>
-                      <th className="px-5 py-3">Email</th>
+                      <th className="px-5 py-3">Username</th>
                       <th className="px-5 py-3">Role</th>
                       <th className="px-5 py-3">Status</th>
                       <th className="px-5 py-3">Added</th>
+                      <th className="px-5 py-3 text-right">
+                        <span className="sr-only">Actions</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-line">
@@ -270,7 +297,9 @@ export function TeamPage() {
                         <td className="px-5 py-3 font-medium text-ink">
                           {member.fullName || "—"}
                         </td>
-                        <td className="px-5 py-3 text-muted">{member.email ?? "—"}</td>
+                        <td className="px-5 py-3">
+                          <span className="font-mono text-xs text-ink">{member.username ?? "—"}</span>
+                        </td>
                         <td className="px-5 py-3">
                           <span
                             className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${roleBadge[member.role]}`}
@@ -301,6 +330,17 @@ export function TeamPage() {
                               })
                             : "—"}
                         </td>
+                        <td className="px-5 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => setResetTarget(member)}
+                            className="btn btn-ghost btn-sm"
+                            title={`Set a new password for ${member.username ?? member.fullName ?? "this account"}`}
+                          >
+                            <KeyRound className="h-3.5 w-3.5" />
+                            Reset password
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -316,6 +356,13 @@ export function TeamPage() {
           </p>
         </div>
       </div>
+
+      <ResetPasswordDialog
+        open={Boolean(resetTarget)}
+        userId={resetTarget?.id ?? null}
+        username={resetTarget?.username ?? resetTarget?.fullName ?? null}
+        onClose={() => setResetTarget(null)}
+      />
     </div>
   );
 }

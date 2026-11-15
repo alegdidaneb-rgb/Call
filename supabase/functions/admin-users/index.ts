@@ -1,22 +1,41 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+// NOTE: this file deliberately begins with the import rather than a comment.
+// The Supabase management API returned a stored body with its leading `/**`
+// removed, which would be a syntax error if that is what actually gets
+// deployed. Starting with a statement makes the round trip verifiable: if the
+// stored body still begins with `import`, nothing was stripped.
 /**
  * Admin-only user provisioning.
  *
  * Creating a Supabase auth user requires the service role key, which must never
- * ship to the browser. This function holds it server-side and exposes two
- * actions:
+ * ship to the browser. This function holds it server-side and exposes four
+ * actions. Every one of them is addressed by *username*: no caller supplies an
+ * email address, and none is ever sent.
  *
- *   { action: "bootstrap", email, password, fullName }
+ *   { action: "bootstrap", username, password, fullName }
  *       Creates the *first* administrator of an empty deployment. Refuses once
  *       any profile exists, so it cannot be used to mint extra admins.
  *
- *   { action: "create", email, password, fullName, role }
+ *   { action: "create", username, password, fullName, role }
  *       Creates an account on behalf of a signed-in administrator. The caller's
  *       JWT is verified here and their `profiles.role` must be `admin`.
+ *
+ *   { action: "reset-password", userId, password }
+ *       An administrator sets a new password for any account. Not optional: the
+ *       address behind a username receives no mail, so there is no self-service
+ *       recovery and a forgotten password would otherwise be permanent.
  *
  *   { action: "status" }
  *       Unauthenticated. Reports whether the deployment still needs its first
  *       administrator, so the sign-in screen can offer setup only when it would
  *       actually succeed. Reveals nothing else.
+ *
+ * Supabase Auth has no username identity, so `provision` derives the account's
+ * address as `<username>@agents.cold-dialer.internal` — a domain that receives
+ * nothing. Sign-in resolves a username back to that address through
+ * `public.resolve_login_email`. Accounts created before migration 005 keep the
+ * real address they already had; nothing is rewritten.
  *
  * `verify_jwt` is disabled for this function because the bootstrap and status
  * actions have no caller to verify. Authorisation is therefore enforced explicitly below rather
@@ -30,10 +49,42 @@
  * role via `public.is_service_role()` and allows it.
  */
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
 const ROLES = ["admin", "manager", "agent"] as const;
 type Role = (typeof ROLES)[number];
+
+/**
+ * Reserved usernames, and the address domain accounts are given.
+ *
+ * Both must stay identical to their database counterparts in migration 005
+ * (`public.reserved_usernames()` and the synthetic domain used by
+ * `public.derive_username`). If they diverge, the client accepts something the
+ * database rejects and the operator sees a constraint violation instead of a
+ * readable message.
+ */
+const RESERVED_USERNAMES = [
+  "admin", "administrator", "root", "system", "setup", "support", "help",
+  "noreply", "no-reply", "postmaster", "webmaster", "abuse", "security",
+  "everyone", "all", "null", "undefined", "unknown", "test", "guest",
+];
+
+const USERNAME_MIN_LENGTH = 3;
+const USERNAME_MAX_LENGTH = 32;
+
+/**
+ * The domain every created account's Supabase Auth identity lives under.
+ *
+ * Deliberately not a domain anybody owns or can receive mail at: an account
+ * created here is addressed by username, and there is no mailbox behind it. A
+ * routable domain would mean real mail bouncing, and would invite somebody to
+ * assume a recovery email exists. The consequence — no self-service recovery, so
+ * an administrator must be able to set a password — is handled by the
+ * `reset-password` action below.
+ */
+const SYNTHETIC_EMAIL_DOMAIN = "agents.cold-dialer.internal";
+
+function syntheticEmail(username: string): string {
+  return `${username}@${SYNTHETIC_EMAIL_DOMAIN}`;
+}
 
 /**
  * Origins allowed to call this function from a browser. Supabase edge functions
@@ -83,13 +134,39 @@ function passwordProblem(password: unknown): string | null {
   return null;
 }
 
-function emailProblem(email: unknown): string | null {
-  if (typeof email !== "string") return "Email is required";
-  const value = email.trim().toLowerCase();
-  if (value.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-    return "A valid email address is required";
+/**
+ * The reason a username is not acceptable, or null when it is.
+ *
+ * Mirrors the `profiles_username_shape` check constraint and the client's
+ * `lib/username.ts`. This copy is the one that counts: it runs before
+ * `createUser`, so a bad name is rejected with a readable message rather than as
+ * a Postgres constraint violation surfaced from the trigger.
+ */
+function usernameProblem(username: unknown): string | null {
+  if (typeof username !== "string") return "A username is required";
+  const value = username.trim().toLowerCase();
+  if (!value) return "A username is required";
+  if (value.length < USERNAME_MIN_LENGTH) {
+    return `Username must be at least ${USERNAME_MIN_LENGTH} characters`;
+  }
+  if (value.length > USERNAME_MAX_LENGTH) {
+    return `Username must be at most ${USERNAME_MAX_LENGTH} characters`;
+  }
+  if (value.includes("@")) {
+    return "Use a username, not an email address";
+  }
+  if (!/^[a-z0-9][a-z0-9._-]*[a-z0-9]$/.test(value)) {
+    return "Username may contain lowercase letters, numbers and . _ - , and must start and end with a letter or number";
+  }
+  if (RESERVED_USERNAMES.includes(value)) {
+    return "That username is reserved";
   }
   return null;
+}
+
+/** Normalises the way the database stores and compares usernames. */
+function normaliseUsername(username: string): string {
+  return username.trim().toLowerCase();
 }
 
 /**
@@ -139,31 +216,50 @@ async function provision(
   admin: ReturnType<typeof createClient>,
   req: Request,
   opts: {
-    email: string;
+    username: string;
     password: string;
     fullName: string;
     role: Role;
     invitedBy: string;
   }
 ): Promise<Response> {
+  const username = normaliseUsername(opts.username);
+
+  // The username is checked before anything is created, so a collision is
+  // reported as "that username is taken" rather than as an auth error about an
+  // address nobody ever saw. Two different Marcos at two different companies now
+  // collide on the username, not on a shared mailbox.
+  const { data: existing, error: lookupError } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("username", username)
+    .maybeSingle();
+  if (lookupError) {
+    console.error("[admin-users] username lookup failed:", lookupError.message);
+    return json(500, { error: "Unable to check whether that username is free" }, req);
+  }
+  if (existing) {
+    return json(409, { error: "That username is already taken" }, req);
+  }
+
   const { data, error } = await admin.auth.admin.createUser({
-    email: opts.email,
+    // Supabase Auth has no username identity, so the address is derived from the
+    // username. It is an implementation detail: never shown, never mailed.
+    email: syntheticEmail(username),
     password: opts.password,
     // Provisioned accounts are created confirmed. There is no self-service
     // mailbox check to satisfy, and an unconfirmed account would be unable to
     // sign in with no way for the user to fix it themselves.
     email_confirm: true,
-    user_metadata: { full_name: opts.fullName },
+    // `username` in metadata is what `handle_new_user()` stores verbatim, so the
+    // trigger does not fall back to deriving one from the synthetic address.
+    user_metadata: { full_name: opts.fullName, username },
   });
 
   if (error || !data?.user) {
     const message = error?.message ?? "";
     if (/already.*registered|already been registered/i.test(message)) {
-      return json(
-        409,
-        { error: "An account with that email already exists" },
-        req
-      );
+      return json(409, { error: "That username is already taken" }, req);
     }
     console.error("[admin-users] createUser failed:", message);
     return json(500, { error: "Unable to create the account" }, req);
@@ -193,7 +289,10 @@ async function provision(
     {
       user: {
         id: data.user.id,
-        email: opts.email,
+        username,
+        // Still returned, because the client normalises through it and because a
+        // pre-username account has a real address here. Nothing renders it.
+        email: syntheticEmail(username),
         fullName: opts.fullName,
         role: opts.role,
         provisioned: true,
@@ -230,7 +329,12 @@ Deno.serve(async (req) => {
   }
 
   const action = body.action;
-  if (action !== "create" && action !== "bootstrap" && action !== "status") {
+  if (
+    action !== "create" &&
+    action !== "bootstrap" &&
+    action !== "status" &&
+    action !== "reset-password"
+  ) {
     return json(400, { error: "Unknown action" }, req);
   }
 
@@ -245,20 +349,57 @@ Deno.serve(async (req) => {
     return json(200, { needsSetup: (count ?? 0) === 0 }, req);
   }
 
-  const emailProblemMessage = emailProblem(body.email);
-  if (emailProblemMessage) return json(400, { error: emailProblemMessage }, req);
-
   const passwordProblemMessage = passwordProblem(body.password);
   if (passwordProblemMessage) {
     return json(400, { error: passwordProblemMessage }, req);
   }
 
-  const email = String(body.email).trim().toLowerCase();
+  // --- An administrator sets somebody else's password ----------------------
+  //
+  // Placed before the username checks: it needs a password but not a username,
+  // because it addresses an account that already has one.
+  if (action === "reset-password") {
+    const auth = await requireAdmin(req, admin);
+    if ("response" in auth) return auth.response;
+
+    const userId = typeof body.userId === "string" ? body.userId.trim() : "";
+    if (!userId) return json(400, { error: "A user id is required" }, req);
+
+    const { data: target, error: targetError } = await admin
+      .from("profiles")
+      .select("id, username")
+      .eq("id", userId)
+      .maybeSingle();
+    if (targetError || !target) {
+      return json(404, { error: "No such account" }, req);
+    }
+
+    const { error: resetError } = await admin.auth.admin.updateUserById(userId, {
+      password: String(body.password),
+    });
+    if (resetError) {
+      console.error("[admin-users] password reset failed:", resetError.message);
+      return json(500, { error: "Unable to set that password" }, req);
+    }
+
+    return json(
+      200,
+      { user: { id: target.id, username: target.username, passwordChanged: true } },
+      req
+    );
+  }
+
+  const usernameProblemMessage = usernameProblem(body.username);
+  if (usernameProblemMessage) {
+    return json(400, { error: usernameProblemMessage }, req);
+  }
+
+  const username = normaliseUsername(String(body.username));
   const password = String(body.password);
   const fullName =
     typeof body.fullName === "string" && body.fullName.trim()
       ? body.fullName.trim().slice(0, 120)
-      : email.split("@")[0];
+      : username;
 
   // --- Bootstrap the first administrator -----------------------------------
   if (action === "bootstrap") {
@@ -283,7 +424,7 @@ Deno.serve(async (req) => {
 
     // Nobody exists to attribute the account to, so it adopts itself.
     return await provision(admin, req, {
-      email,
+      username,
       password,
       fullName,
       role: "admin",
@@ -313,7 +454,7 @@ Deno.serve(async (req) => {
   if ("response" in auth) return auth.response;
 
   return await provision(admin, req, {
-    email,
+    username,
     password,
     fullName,
     role: requestedRole,

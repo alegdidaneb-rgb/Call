@@ -1,6 +1,10 @@
 import db from "./database.js";
 import { v4 as uuid } from "uuid";
 import bcrypt from "bcryptjs";
+import { syntheticEmail } from "../lib/username.js";
+
+/** The username the seeded administrator signs in with. */
+const SEED_USERNAME = "seedadmin";
 
 const FIRST_NAMES = [
   "James", "Mary", "Robert", "Patricia", "John", "Jennifer", "Michael",
@@ -63,15 +67,22 @@ function seed() {
   const password = seedPassword || "password123";
   const passwordHash = bcrypt.hashSync(password, 12);
 
+  // `admin` is a reserved username in every deployment mode, so the seeded
+  // account does not use it either: a fixture that signs in with a name the
+  // product refuses to issue would be a misleading example. The email column is
+  // still populated because it is NOT NULL, but nothing signs in with it.
   db.prepare(
-    "INSERT INTO profiles (id, email, full_name, password_hash, role) VALUES (?, ?, ?, ?, ?)"
-  ).run(userId, "admin@example.com", "Admin User", passwordHash, "admin");
+    "INSERT INTO profiles (id, username, email, full_name, password_hash, role) " +
+      "VALUES (?, ?, ?, ?, ?, ?)"
+  ).run(userId, SEED_USERNAME, syntheticEmail(SEED_USERNAME), "Admin User", passwordHash, "admin");
 
   if (usingDefaultPassword) {
     console.warn(
-      "[seed] No SEED_ADMIN_PASSWORD set; admin@example.com was created with the well-known " +
-        "development password 'password123'. Set SEED_ADMIN_PASSWORD for anything non-local."
+      `[seed] No SEED_ADMIN_PASSWORD set; the '${SEED_USERNAME}' account was created with the ` +
+        "well-known development password 'password123'. Set SEED_ADMIN_PASSWORD for anything non-local."
     );
+  } else {
+    console.log(`[seed] Sign in with the username '${SEED_USERNAME}'.`);
   }
 
   const campaignIds: string[] = [];

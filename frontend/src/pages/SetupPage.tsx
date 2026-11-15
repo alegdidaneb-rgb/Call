@@ -5,6 +5,7 @@ import { AlertCircle, ArrowLeft, ShieldCheck, UserPlus } from "lucide-react";
 import { AuthScreen } from "@/components/auth/AuthScreen";
 import { PasswordField } from "@/components/auth/PasswordField";
 import { bootstrapFirstAdmin, fetchSetupStatus } from "@/lib/auth";
+import { normaliseUsername, usernameProblem } from "@/lib/username";
 import { passwordSchema } from "@/lib/passwordPolicy";
 
 /**
@@ -19,7 +20,12 @@ import { passwordSchema } from "@/lib/passwordPolicy";
 const setupSchema = z
   .object({
     fullName: z.string().trim().min(2, "Enter your full name"),
-    email: z.string().trim().toLowerCase().email("Enter a valid email address"),
+    username: z.string().superRefine((value, context) => {
+      const problem = usernameProblem(value);
+      if (problem) {
+        context.addIssue({ code: z.ZodIssueCode.custom, message: problem });
+      }
+    }),
     password: passwordSchema,
     confirmPassword: z.string(),
   })
@@ -28,18 +34,18 @@ const setupSchema = z
     path: ["confirmPassword"],
   });
 
-type FieldName = "fullName" | "email" | "password" | "confirmPassword";
+type FieldName = "fullName" | "username" | "password" | "confirmPassword";
 type FieldErrors = Partial<Record<FieldName, string>>;
 
 export function SetupPage() {
   const navigate = useNavigate();
   const nameId = useId();
-  const emailId = useId();
+  const usernameId = useId();
 
   const [checking, setChecking] = useState(true);
   const [needsSetup, setNeedsSetup] = useState(false);
   const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -75,7 +81,7 @@ export function SetupPage() {
     event.preventDefault();
     setFormError(null);
 
-    const parsed = setupSchema.safeParse({ fullName, email, password, confirmPassword });
+    const parsed = setupSchema.safeParse({ fullName, username, password, confirmPassword });
     if (!parsed.success) {
       const next: FieldErrors = {};
       for (const issue of parsed.error.issues) {
@@ -90,7 +96,7 @@ export function SetupPage() {
 
     try {
       await bootstrapFirstAdmin({
-        email: parsed.data.email,
+        username: normaliseUsername(parsed.data.username),
         password: parsed.data.password,
         fullName: parsed.data.fullName,
       });
@@ -109,7 +115,7 @@ export function SetupPage() {
     <AuthScreen
       tagline="First-run setup"
       title="Create the first administrator"
-      description="This screen is available only while the database has no accounts. Every account after this one is created by an administrator from the Team page."
+      description="This screen is available only while the database has no accounts. You choose a username and a password; no email address is needed, because none is ever sent. Every account after this one is created by an administrator from the Team page."
       footer={
         <p>
           Already have an account?{" "}
@@ -190,24 +196,31 @@ export function SetupPage() {
           </div>
 
           <div>
-            <label className="label" htmlFor={emailId}>
-              Work email
+            <label className="label" htmlFor={usernameId}>
+              Username
             </label>
             <input
-              id={emailId}
-              name="email"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              autoComplete="email"
-              placeholder="you@company.com"
-              aria-invalid={Boolean(fieldErrors.email)}
-              aria-describedby={fieldErrors.email ? `${emailId}-error` : undefined}
-              className={`input ${fieldErrors.email ? "!border-danger/50" : ""}`}
+              id={usernameId}
+              name="username"
+              type="text"
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              autoComplete="username"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              placeholder="alex"
+              aria-invalid={Boolean(fieldErrors.username)}
+              aria-describedby={fieldErrors.username ? `${usernameId}-error` : undefined}
+              className={`input ${fieldErrors.username ? "!border-danger/50" : ""}`}
             />
-            {fieldErrors.email ? (
-              <p id={`${emailId}-error`} className="mt-1 text-xs text-danger" role="alert">
-                {fieldErrors.email}
+            <p className="mt-1 text-xs text-muted">
+              What you will type to sign in. Lowercase letters, numbers and . _ - , between 3 and 32
+              characters.
+            </p>
+            {fieldErrors.username ? (
+              <p id={`${usernameId}-error`} className="mt-1 text-xs text-danger" role="alert">
+                {fieldErrors.username}
               </p>
             ) : null}
           </div>

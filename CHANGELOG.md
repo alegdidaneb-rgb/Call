@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Accounts are addressed by **username** instead of email, everywhere: first-run
+  setup, the team roster and sign-in. No screen collects an email address any
+  more, and no account has a mailbox behind it
+- `profiles.username`, unique case-insensitively, with a shape constraint and a
+  reserved-name list (`admin`, `root`, `support`, …) so a name the product cannot
+  honour is never issued — migration 005, plus `public.resolve_login_email` for
+  sign-in and `public.derive_username` for the backfill
+- **Team → Reset password**: an administrator can set a new password for any
+  account (`admin-users` `reset-password` action; `POST /api/users/:id/password`
+  in API mode). This is required rather than convenient — a synthetic address
+  cannot receive a reset link, so without it a forgotten password is permanent
+- `lib/username.ts` (client) and `backend/src/lib/username.ts`, so a bad username
+  is rejected in the form rather than after a round trip
+
+
 - One page header (`components/common/PageHeader.tsx`), now used by every page.
   Eleven screens each hand-rolled their own title, at four different sizes, with
   the description sometimes present and the actions variously beside, below or
@@ -136,6 +151,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Data seeder with sample leads
 
 ### Changed
+
+- Sign-in now takes a username. An email address is still accepted and still
+  resolves, because accounts created before this change keep the address they were
+  created with — their `auth.users.email` was deliberately not rewritten, since
+  that also means surgery on `auth.identities` on the only administrator a live
+  deployment has
+- The team roster shows usernames, and the trunk-assignment dropdown prefers a
+  name or username over an address
+- "An account with that email already exists" became "That username is already
+  taken". Two people at two different companies who are both called Marco now
+  collide on the username, and naming an address the administrator never typed
+  would have been a message about nothing
+- The self-hosted backend derives usernames for existing rows on boot, and the
+  seeded administrator signs in as `seedadmin` rather than `admin@example.com`
+
 
 - Type, corner-radius and elevation are now scales rather than whatever each
   component reached for: eight text sizes with the line height attached, five

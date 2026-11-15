@@ -9,6 +9,16 @@ export type AppRole = "admin" | "manager" | "agent";
  */
 export interface AppUser {
   id: string;
+  /**
+   * How the account signs in, and how it is named everywhere in the interface.
+   *
+   * `email` below is the Supabase Auth identity. For accounts created since
+   * migration 005 it is a synthetic address that is never delivered to and never
+   * shown; for older accounts it is the real address they were created with.
+   * Either way it is not what an operator types, which is why every screen shows
+   * this field instead.
+   */
+  username: string | null;
   email: string | null;
   fullName: string | null;
   role: AppRole;

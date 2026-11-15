@@ -151,8 +151,14 @@ function remove(path: string): Promise<void> {
   return request<void>(path, { method: "DELETE" });
 }
 
+/**
+ * What an administrator supplies to create an account.
+ *
+ * No email: the server derives the Supabase Auth identity from `username`, so
+ * the two deployment modes cannot disagree about the synthetic domain.
+ */
 export interface NewUserInput {
-  email: string;
+  username: string;
   password: string;
   fullName: string;
   role: AppUser["role"];
@@ -166,10 +172,14 @@ export const api = {
      * First-run bootstrap; the server refuses once any account exists. No token
      * comes back — the new administrator signs in through the normal path.
      */
-    bootstrap: (email: string, password: string, fullName: string) =>
-      post<{ user: AppUser }>("/api/auth/bootstrap", { email, password, fullName }),
-    login: (email: string, password: string) =>
-      post<{ user: AppUser; token: string }>("/api/auth/login", { email, password }),
+    bootstrap: (username: string, password: string, fullName: string) =>
+      post<{ user: AppUser }>("/api/auth/bootstrap", { username, password, fullName }),
+    /**
+     * `identifier` is a username, or an address for an account that predates
+     * usernames. The server resolves it.
+     */
+    login: (identifier: string, password: string) =>
+      post<{ user: AppUser; token: string }>("/api/auth/login", { identifier, password }),
     me: () => request<AppUser>("/api/auth/me"),
   },
 
@@ -181,6 +191,14 @@ export const api = {
      */
     list: () => request<AppUser[]>("/api/users"),
     create: (data: NewUserInput) => post<{ user: AppUser }>("/api/users", data),
+    /**
+     * Sets a new password for somebody else.
+     *
+     * Not optional: a synthetic login address cannot receive mail, so there is no
+     * self-service recovery. Without this a forgotten password is permanent.
+     */
+    resetPassword: (userId: string, password: string) =>
+      post<{ user: AppUser }>(`/api/users/${userId}/password`, { password }),
   },
 
   leads: {

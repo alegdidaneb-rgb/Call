@@ -30,6 +30,8 @@ type SipAccountRow = Database["public"]["Tables"]["sip_accounts"]["Row"];
  */
 export interface AssignablePerson {
   id: string;
+  /** What the trunk-assignment dropdown shows; `email` is only a last resort. */
+  username: string | null;
   email: string | null;
   fullName: string | null;
   role: AppRole;
@@ -212,6 +214,7 @@ export function useSipAccountsAdmin() {
         const users = await api.users.list();
         return users.map((user) => ({
           id: user.id,
+          username: user.username,
           email: user.email,
           fullName: user.fullName,
           role: user.role,
@@ -220,12 +223,13 @@ export function useSipAccountsAdmin() {
       }
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, email, full_name, role, invited_by");
+        .select("id, username, email, full_name, role, invited_by");
       if (error) throw error;
       return (data ?? []).map((row) => {
         const role = normaliseRole(row.role);
         return {
           id: row.id,
+          username: row.username,
           email: row.email,
           fullName: row.full_name,
           role,

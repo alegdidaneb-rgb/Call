@@ -1,6 +1,7 @@
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import { api, isApiMode, setAuthToken } from "@/lib/apiClient";
+import { api, isApiMode, setAuthToken, type NewUserInput } from "@/lib/apiClient";
+import { isEmailLike, normaliseUsername, usernameFromEmail } from "@/lib/username";
 import { isProvisioned, normaliseRole, type AppRole, type AppUser } from "@/types/app";
 
 /** Re-exported for existing callers; the definition lives in `apiClient`. */
@@ -13,6 +14,7 @@ export { isApiMode };
  */
 const DEV_USER: AppUser = {
   id: "dev-user-001",
+  username: "dev",
   email: "dev@example.com",
   fullName: "Dev User",
   role: "admin",
@@ -33,15 +35,12 @@ export function devFallbackUser(): AppUser | null {
  */
 const USERS_FUNCTION = "admin-users";
 
-export interface NewUserInput {
-  email: string;
-  password: string;
-  fullName: string;
-  role: AppRole;
-}
+/** Re-exported so callers import it from either module and get the same type. */
+export type { NewUserInput };
 
 export interface TeamMember {
   id: string;
+  username: string | null;
   email: string | null;
   fullName: string | null;
   role: AppRole;
@@ -100,7 +99,7 @@ export async function bootstrapFirstAdmin(
   input: Omit<NewUserInput, "role">
 ): Promise<AppUser> {
   if (isApiMode) {
-    const { user } = await api.auth.bootstrap(input.email, input.password, input.fullName);
+    const { user } = await api.auth.bootstrap(input.username, input.password, input.fullName);
     return toAppUser(user);
   }
   const data = await invokeUsersFunction({ action: "bootstrap", ...input });
@@ -126,22 +125,68 @@ export async function listTeamMembers(): Promise<TeamMember[]> {
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, email, full_name, role, invited_by, created_at")
+    .select("id, username, email, full_name, role, invited_by, created_at")
     .order("created_at", { ascending: true });
   if (error) throw error;
   return (data ?? []).map(toTeamMember);
 }
 
-export async function signIn(email: string, password: string): Promise<AppUser> {
+/**
+ * Turn what somebody typed into the address Supabase Auth authenticates against.
+ *
+ * Supabase has no username identity, so a username is resolved through
+ * `public.resolve_login_email` — a security-definer function added in migration
+ * 005, because an unauthenticated caller has no row-level access to `profiles`.
+ * An address is passed straight through, which is what keeps accounts created
+ * before usernames existed able to sign in.
+ */
+async function resolveLoginEmail(identifier: string): Promise<string> {
+  const value = identifier.trim();
+  if (!value) throw new Error("Enter your username");
+  if (isEmailLike(value)) return value.toLowerCase();
+
+  const { data, error } = await supabase.rpc("resolve_login_email", { p_username: value });
+  if (error) {
+    throw new Error(
+      `Could not look up that username: ${error.message}. If this deployment predates usernames, sign in with your email address instead.`
+    );
+  }
+  const email = typeof data === "string" && data.trim() ? data.trim() : null;
+  if (!email) throw new Error("No account uses that username");
+  return email;
+}
+
+/**
+ * Sign in with a username, or with an address for an account that predates them.
+ */
+export async function signIn(identifier: string, password: string): Promise<AppUser> {
   if (isApiMode) {
-    const { user, token } = await api.auth.login(email, password);
+    const { user, token } = await api.auth.login(identifier.trim(), password);
     setAuthToken(token);
     return toAppUser(user);
   }
+  const email = await resolveLoginEmail(identifier);
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw error;
   if (!data.user) throw new Error("Sign in did not return a user");
   return toAppUser(await fetchSupabaseProfile(data.user.id, data.user.email));
+}
+
+/**
+ * An administrator sets a new password for somebody else.
+ *
+ * This is not a convenience feature. Accounts sign in with a username backed by
+ * an address that receives no mail, so there is no self-service recovery: without
+ * this, a forgotten password would be permanent and the only remedy would be
+ * deleting and recreating the account, losing everything attributed to it.
+ */
+export async function resetUserPassword(userId: string, password: string): Promise<AppUser> {
+  if (isApiMode) {
+    const { user } = await api.users.resetPassword(userId, password);
+    return toAppUser(user);
+  }
+  const data = await invokeUsersFunction({ action: "reset-password", userId, password });
+  return toAppUser(data?.user);
 }
 
 export async function signOut(): Promise<void> {
@@ -186,20 +231,29 @@ async function fetchSupabaseProfile(
   try {
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, email, full_name, role, invited_by")
+      .select("id, username, email, full_name, role, invited_by")
       .eq("id", userId)
       .single();
     if (error || !data) throw error ?? new Error("No profile row");
     const role = normaliseRole(data.role);
+    const profileEmail = data.email ?? email ?? null;
     return {
       id: data.id ?? userId,
-      email: data.email ?? email ?? null,
+      username: data.username ?? usernameFromEmail(profileEmail),
+      email: profileEmail,
       fullName: data.full_name ?? null,
       role,
       provisioned: isProvisioned(role, data.invited_by),
     };
   } catch {
-    return { id: userId, email: email ?? null, fullName: null, role: "agent", provisioned: false };
+    return {
+      id: userId,
+      username: usernameFromEmail(email),
+      email: email ?? null,
+      fullName: null,
+      role: "agent",
+      provisioned: false,
+    };
   }
 }
 
@@ -211,9 +265,11 @@ function toAppUser(raw: unknown): AppUser {
     typeof value.provisioned === "boolean"
       ? value.provisioned
       : isProvisioned(role, value.invited_by ?? value.invitedBy);
+  const userEmail = (value.email as string | null) ?? null;
   return {
     id: String(value.id ?? ""),
-    email: (value.email as string | null) ?? null,
+    username: (value.username as string | null) ?? usernameFromEmail(userEmail),
+    email: userEmail,
     fullName:
       (value.fullName as string | null) ??
       (value.full_name as string | null) ??
@@ -227,9 +283,11 @@ function toAppUser(raw: unknown): AppUser {
 function toTeamMember(raw: unknown): TeamMember {
   const value = (raw ?? {}) as Record<string, unknown>;
   const role = normaliseRole(value.role);
+  const memberEmail = (value.email as string | null) ?? null;
   return {
     id: String(value.id ?? ""),
-    email: (value.email as string | null) ?? null,
+    username: (value.username as string | null) ?? usernameFromEmail(memberEmail),
+    email: memberEmail,
     fullName:
       (value.fullName as string | null) ?? (value.full_name as string | null) ?? null,
     role,
@@ -240,6 +298,9 @@ function toTeamMember(raw: unknown): TeamMember {
     createdAt: (value.createdAt as string | null) ?? (value.created_at as string | null) ?? null,
   };
 }
+
+/** Exported so the forms normalise exactly the way sign-in does. */
+export { normaliseUsername };
 
 export function onAuthStateChange(callback: (user: AppUser | null) => void) {
   if (isApiMode) {

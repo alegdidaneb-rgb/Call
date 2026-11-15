@@ -118,8 +118,10 @@ one of them does not reopen registration.
    backend mirrors this with `POST /api/users` behind `requireRole("admin")`.
 3. **Database.** `profiles.invited_by` records who onboarded an account. Every
    agent-facing RLS policy is gated on `public.is_provisioned()`, and
-   `protect_profile_fields()` stops a non-admin from changing `role` or
-   `invited_by` — including on their own row.
+   `protect_profile_fields()` stops a non-admin from changing `role`, `invited_by`
+   or `username` — including on their own row. `username` is in that set because
+   it is an identity: without it an agent could rename themselves to a colleague's
+   username and let the unique index decide who keeps it.
 
 The consequence is that an account created by calling `auth.signUp()` directly
 with the public anon key **authenticates but can read nothing**: `role = 'agent'`,
@@ -141,8 +143,67 @@ Provision a fresh deployment promptly: while `profiles` is empty, bootstrap is
 open to anyone who can reach the site.
 
 **Handover.** Accounts are created already confirmed, with a temporary password
-the admin sets. There is no email confirmation step, so the password must be
-passed over a secure channel and rotated by the new user.
+the admin sets. There is no email confirmation step and no mailbox behind the
+account, so the username and password must be passed over a secure channel and
+the password rotated by the new user.
+
+### Usernames and sign-in
+
+Accounts are created from a **username** and signed into with one. Nobody types an
+email address anywhere in the product: not on `/setup`, not on `/team`, not on
+`/login`.
+
+Supabase Auth has no username identity — `auth.admin.createUser` accepts an email
+or a phone, and `profiles.email` is `not null unique` — so the email cannot be
+removed, only made irrelevant. It is kept as the internal identity:
+
+- Accounts created since migration 005 get a synthetic address,
+  `<username>@agents.cold-dialer.internal`. That domain is not routable and is not
+  owned by anyone, so no mail is ever sent or bounced. It exists purely to satisfy
+  a `not null unique` column.
+- Accounts that predate it **keep the real address they were created with**. Their
+  `auth.users.email` was deliberately not rewritten: doing so also requires
+  matching surgery on `auth.identities`, on a deployment whose only account is its
+  only administrator, with no recovery path if it went wrong. They sign in with a
+  username derived from their address, and their address still works.
+- Sign-in resolves a username to its address through
+  `public.resolve_login_email`, one path for both kinds of account.
+
+**Accepted trade: usernames are enumerable.** `resolve_login_email` is
+`security definer` and granted to `anon`, because sign-in happens before there is
+a session and an unauthenticated caller has no row-level access to `profiles` at
+all. An unauthenticated caller can therefore confirm that a username exists. It
+returns the address and nothing else — no role, no name, no other account — and
+password guessing remains rate limited by Supabase. The alternative was rewriting
+`auth.users.email` on the sole administrator of a live deployment, which was
+judged a worse risk than leaking the existence of a username.
+
+**There is no self-service recovery, by construction.** A synthetic address cannot
+receive a reset link, so "forgot password" is not offered and cannot be added
+without reintroducing email collection. Administrators set passwords instead, from
+**Team → Reset password**, via the edge function's `reset-password` action
+(`POST /api/users/:id/password` in API mode). Two limits are stated rather than
+hidden:
+
+- An administrator can reset another administrator's password and so act as them.
+  Every administrator already has full authority over all data, so this grants no
+  new reach, but it does defeat per-account attribution.
+- Sessions already issued to the old password keep working until their token
+  expires. Nothing in this schema can revoke them. If an account is suspected
+  compromised, deleting it is the only complete remedy.
+
+**If the sole administrator forgets their password**, the app cannot help: there is
+no address to mail and no second administrator to reset it. Recovery is through the
+Supabase dashboard (or `SEED_ADMIN_PASSWORD` on a self-hosted deployment), not
+through this product.
+
+**Break-glass: restoring a real address.** Because `profiles.email` still holds the
+original address for migrated accounts, and `auth.users.email` was never touched,
+an older account can be reverted to email sign-in with no data change at all — the
+address simply still works. For an account created with a synthetic address,
+restoring a deliverable one means `auth.admin.updateUserById` with a new email
+*plus* a matching update to `auth.identities`, and `mailer_secure_email_change_enabled`
+is on, so expect a confirmation round trip. Do this on a throwaway account first.
 
 ## Dependency Advisories
 

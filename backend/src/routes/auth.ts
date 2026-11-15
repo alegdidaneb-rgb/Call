@@ -5,11 +5,21 @@ import { z } from "zod";
 import db from "../db/database.js";
 import { generateToken, authMiddleware, type AuthRequest } from "../middleware/auth.js";
 import { BCRYPT_ROUNDS } from "../config/env.js";
+import { normaliseUsername, syntheticEmail, usernameProblem } from "../lib/username.js";
 
 const router = Router();
 
+/** Validated by `lib/username`, which is the copy that must match migration 005. */
+const usernameField = z
+  .string()
+  .superRefine((value, context) => {
+    const problem = usernameProblem(value);
+    if (problem) context.addIssue({ code: z.ZodIssueCode.custom, message: problem });
+  })
+  .transform(normaliseUsername);
+
 const newAccountSchema = z.object({
-  email: z.string().trim().toLowerCase().email("A valid email address is required"),
+  username: usernameField,
   password: z
     .string()
     .min(10, "Password must be at least 10 characters")
@@ -19,13 +29,29 @@ const newAccountSchema = z.object({
   fullName: z.string().trim().min(1).max(120).optional().nullable(),
 });
 
-const loginSchema = z.object({
-  email: z.string().trim().toLowerCase().email(),
-  password: z.string().min(1, "Password is required").max(200),
-});
+/**
+ * Sign-in takes a username. `email` is still accepted as an alternative spelling
+ * of the same field, and an address still resolves, so accounts created before
+ * usernames existed are not locked out and an older client build keeps working
+ * against this backend.
+ */
+const loginSchema = z
+  .object({
+    identifier: z.string().trim().min(1).optional(),
+    email: z.string().trim().min(1).optional(),
+    password: z.string().min(1, "Password is required").max(200),
+  })
+  .transform((value) => ({
+    identifier: value.identifier ?? value.email ?? "",
+    password: value.password,
+  }))
+  .refine((value) => value.identifier.length > 0, {
+    message: "Username and password are required",
+  });
 
 interface ProfileRow {
   id: string;
+  username: string | null;
   email: string;
   full_name: string | null;
   role: string;
@@ -36,6 +62,7 @@ interface ProfileRow {
 function publicUser(row: ProfileRow) {
   return {
     id: row.id,
+    username: row.username,
     email: row.email,
     fullName: row.full_name,
     role: row.role,
@@ -75,7 +102,7 @@ router.post("/bootstrap", async (req, res) => {
     res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" });
     return;
   }
-  const { email, password, fullName } = parsed.data;
+  const { username, password, fullName } = parsed.data;
 
   try {
     // Hashing is async and better-sqlite3 transactions are not, so the hash is
@@ -87,10 +114,12 @@ router.post("/bootstrap", async (req, res) => {
       const existing = db.prepare("SELECT COUNT(*) AS n FROM profiles").get() as { n: number };
       if (existing.n > 0) return null;
       // Self-adopted: there is no administrator yet to attribute it to.
+      // The address is derived from the username: `email` is NOT NULL UNIQUE and
+      // predates usernames, so it stays as the storage identity. Nothing mails it.
       db.prepare(
-        "INSERT INTO profiles (id, email, full_name, password_hash, role, invited_by) " +
-          "VALUES (?, ?, ?, ?, 'admin', ?)"
-      ).run(id, email, fullName ?? null, passwordHash, id);
+        "INSERT INTO profiles (id, username, email, full_name, password_hash, role, invited_by) " +
+          "VALUES (?, ?, ?, ?, ?, 'admin', ?)"
+      ).run(id, username, syntheticEmail(username), fullName ?? username, passwordHash, id);
       return id;
     });
 
@@ -105,7 +134,8 @@ router.post("/bootstrap", async (req, res) => {
 
     const row = db
       .prepare(
-        "SELECT id, email, full_name, role, password_hash, invited_by FROM profiles WHERE id = ?"
+        "SELECT id, username, email, full_name, role, password_hash, invited_by " +
+          "FROM profiles WHERE id = ?"
       )
       .get(created) as ProfileRow;
 
@@ -115,7 +145,7 @@ router.post("/bootstrap", async (req, res) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : "";
     if (/UNIQUE/i.test(message)) {
-      res.status(409).json({ error: "An account with that email already exists" });
+      res.status(409).json({ error: "That username is already taken" });
       return;
     }
     console.error("[auth] bootstrap failed:", err);
@@ -126,29 +156,38 @@ router.post("/bootstrap", async (req, res) => {
 router.post("/login", async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Email and password are required" });
+    res.status(400).json({
+      error: parsed.error.issues[0]?.message ?? "Username and password are required",
+    });
     return;
   }
-  const { email, password } = parsed.data;
+  const { identifier, password } = parsed.data;
 
   try {
+    // A username is the normal path; an address still matches, for accounts that
+    // predate usernames. Both are compared case-insensitively, the way the unique
+    // index stores them.
     const user = db
       .prepare(
-        "SELECT id, email, full_name, role, password_hash, invited_by FROM profiles WHERE email = ?"
+        "SELECT id, username, email, full_name, role, password_hash, invited_by FROM profiles " +
+          "WHERE lower(username) = lower(?) OR lower(email) = lower(?)"
       )
-      .get(email) as ProfileRow | undefined;
+      .get(identifier, identifier) as ProfileRow | undefined;
 
     // Hash a dummy value on the miss path so that response timing does not
-    // reveal whether the address exists.
+    // reveal whether the username exists. Note this cannot hide existence
+    // completely: `/status` and the 404 paths elsewhere are coarser signals, and
+    // the Supabase deployment exposes `resolve_login_email` to anon. Recorded in
+    // SECURITY.md rather than papered over.
     if (!user?.password_hash) {
       await bcrypt.hash(password, BCRYPT_ROUNDS);
-      res.status(401).json({ error: "Invalid email or password" });
+      res.status(401).json({ error: "Invalid username or password" });
       return;
     }
 
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
-      res.status(401).json({ error: "Invalid email or password" });
+      res.status(401).json({ error: "Invalid username or password" });
       return;
     }
 
@@ -162,7 +201,8 @@ router.post("/login", async (req, res) => {
 router.get("/me", authMiddleware, (req: AuthRequest, res) => {
   const user = db
     .prepare(
-      "SELECT id, email, full_name, role, password_hash, invited_by FROM profiles WHERE id = ?"
+      "SELECT id, username, email, full_name, role, password_hash, invited_by " +
+        "FROM profiles WHERE id = ?"
     )
     .get(req.userId!) as ProfileRow | undefined;
 
