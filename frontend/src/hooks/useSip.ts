@@ -51,6 +51,9 @@ export interface SipAccountPayload {
   ws_url: string;
   caller_id: string | null;
   stun_urls: string[];
+  turn_urls: string[];
+  turn_username: string | null;
+  turn_credential: string | null;
   register_expiry: number;
   user_id: string | null;
   enabled: boolean;
@@ -78,6 +81,11 @@ function rowToAccount(row: SipAccountRow): SipAccount | null {
     wsUrl,
     callerId: row.caller_id ?? undefined,
     stunUrls: resolveStunUrls(provider, row.stun_urls),
+    // Absent rather than defaulted: unlike STUN, there is no public TURN relay to
+    // fall back to, so an account without one simply has no relay.
+    turnUrls: (row.turn_urls ?? []).filter(Boolean),
+    turnUsername: (row.turn_username ?? "").trim() || undefined,
+    turnCredential: (row.turn_credential ?? "").trim() || undefined,
     registerExpiry: row.register_expiry ?? 600,
     isTrunkDefault: row.user_id === null,
   };

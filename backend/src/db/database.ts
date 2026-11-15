@@ -144,7 +144,7 @@ const SCHEMA = `
     user_id text REFERENCES profiles(id) ON DELETE CASCADE,
     label text,
     provider text NOT NULL DEFAULT 'custom'
-      CHECK (provider IN ('signalwire', 'telnyx', 'twilio', 'custom')),
+      CHECK (provider IN ('signalwire', 'telnyx', 'twilio', 'bitcall', 'custom')),
     sip_uri text NOT NULL,
     -- Stored in plaintext, as it is in the Supabase deployment: the browser needs
     -- it to register a SIP session, so it cannot be hashed. Documented in
@@ -153,6 +153,30 @@ const SCHEMA = `
     ws_url text NOT NULL,
     caller_id text,
     stun_urls text NOT NULL DEFAULT '["stun:stun.l.google.com:19302"]',
+    -- A relay is what carries media when STUN cannot: both ends behind a symmetric
+    -- NAT, or a firewall dropping inbound UDP. Empty means no relay, which is a
+    -- valid configuration for agents on open networks.
+    turn_urls text NOT NULL DEFAULT '[]',
+    turn_username text,
+    -- Plaintext, as the SIP password is: the browser must send it to the relay.
+    turn_credential text,
+    -- Half a relay credential is worse than none. With no username the browser
+    -- would be given TURN servers it cannot authenticate to, the allocation would
+    -- be refused, and the call would silently fall back to a direct path that does
+    -- not work -- the failure TURN exists to prevent, now invisible.
+    CONSTRAINT sip_accounts_turn_credential_pairs CHECK (
+      (turn_username IS NULL AND turn_credential IS NULL)
+      OR (COALESCE(BTRIM(turn_username), '') <> '' AND COALESCE(BTRIM(turn_credential), '') <> '')
+    ),
+    -- A credential with no server to use it on is a configuration mistake too.
+    --
+    -- Compared as text rather than parsed, because a CHECK constraint may not
+    -- contain a subquery and every JSON array function is one. Safe here because
+    -- this column is only ever written through JSON.stringify, which produces
+    -- exactly '[]' for an empty list and never adds whitespace.
+    CONSTRAINT sip_accounts_turn_needs_server CHECK (
+      turn_username IS NULL OR BTRIM(turn_urls) NOT IN ('[]', '', 'null')
+    ),
     register_expiry integer NOT NULL DEFAULT 600 CHECK (register_expiry BETWEEN 60 AND 3600),
     enabled integer NOT NULL DEFAULT 1,
     created_at timestamptz NOT NULL DEFAULT now(),

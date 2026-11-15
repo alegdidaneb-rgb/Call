@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **TURN relay support** — migration 006 adds `turn_urls`, `turn_username` and
+  `turn_credential` to `sip_accounts`, and the softphone now offers them to WebRTC
+  alongside STUN. STUN only reports a browser's public address, so when both ends
+  sit behind a symmetric NAT, or a firewall drops inbound UDP, the call connects
+  and there is no audio in one or both directions — while the call log records it as
+  answered with a real duration. A relay is the only thing that fixes that, and
+  there was previously no way to configure one
+- **Check microphone and audio path** on the Phone page: gathers ICE candidates
+  against the settings in the form and reports which kinds came back (`host`,
+  `srflx`, `relay`). An account with TURN servers that gathers no relay candidate is
+  reported as a failure naming the cause. Needs no SIP credentials and places no
+  call, so it can be run before saving — registration succeeding says nothing about
+  whether anybody would hear anything
+- **Bitcall** is a named provider preset rather than something to file under
+  "Other". It carries the fact that Bitcall publishes SIP on
+  `gateway.bitcall.io:5060/udp` only, so a browser needs
+  `@bitcall/webrtc-sip-gateway` on a host the operator controls, and that the
+  gateway's installer offers coturn — see `docs/bitcall-gateway.md`
+- `VITE_SIP_TURN_URLS`, `VITE_SIP_TURN_USERNAME` and `VITE_SIP_TURN_CREDENTIAL` for
+  deployments that configure the softphone at build time
 - Accounts are addressed by **username** instead of email, everywhere: first-run
   setup, the team roster and sign-in. No screen collects an email address any
   more, and no account has a mailbox behind it
@@ -152,6 +172,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- ICE servers have one definition. They were built separately for a live call and
+  for the configuration test, and two copies of an ICE list drift into a test that
+  passes while real calls have no audio; both now call `resolveIceServers`
+- A half-configured relay is refused rather than sent to the browser. TURN servers
+  with no credential, or a credential with no server, are rejected by the form, by
+  the API and by a check constraint: given servers it cannot authenticate to, a
+  browser is refused an allocation and quietly falls back to a direct path, which
+  reproduces the silence TURN exists to prevent behind a configuration that looks
+  complete
 - Sign-in now takes a username. An email address is still accepted and still
   resolves, because accounts created before this change keep the address they were
   created with — their `auth.users.email` was deliberately not rewritten, since
@@ -301,6 +330,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Creating an account failed with **"Failed to send a request to the Edge
+  Function"** — the Supabase client's `FunctionsFetchError`, meaning `fetch` itself
+  failed and no response was readable. The `admin-users` function imported the
+  Supabase client from a CDN at module scope, so a cold start fetched a third-party
+  registry before executing a line of code; if that failed the worker died with
+  nothing running to log anything, and every request including the CORS preflight
+  got the platform's own error page, which carries no `Access-Control-Allow-Origin`
+  and so cannot be read cross-origin. The module now has no static imports, the
+  dependency loads inside the request where a failure is caught and answered as
+  `502` JSON naming it, and `Deno.serve` wraps the handler so no path — including
+  one nobody anticipated — can respond without origin headers
+- That specifier was also floating: `@supabase/supabase-js@2` resolves to whatever
+  is newest when the worker boots, so one deploy could load different code on
+  different days. Three sources are now tried in order — `npm:` pinned to 2.118.0,
+  the same version through esm.sh, then the floating range as a last resort. `npm:`
+  first also keeps a third-party CDN out of the path of code holding the service
+  role key. A failure lists every source tried and why, which distinguishes a
+  registry outage from a runtime that cannot resolve the specifier at all
+- The ported backend's duplicate-account message had stopped working. It matched
+  `"UNIQUE"`, which is how SQLite words it; Postgres says `duplicate key value
+  violates unique constraint`, so saving a second trunk default returned a generic
+  "Could not save the SIP account" instead of saying what was actually wrong. It now
+  matches on the SQLSTATE, which does not depend on wording
+- `PATCH /api/sip-accounts/:id` had no error handling, so a constraint violation
+  reached the global handler as a 500 with a Postgres message in it. Refusing a
+  half-configured relay now returns 400 with the reason
 - The `admin-users` edge function rejected the deployment's own preview URLs. Its
   allowed origins were an enumerated list that had to be edited every time Vercel
   produced a new host, so each new branch silently lost the ability to create

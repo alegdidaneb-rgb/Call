@@ -92,6 +92,17 @@ shared trunk default. `anon` has no grants at all. A partial unique index allows
 at most one trunk default, so the "which extension am I dialling from?" lookup
 cannot become ambiguous.
 
+A TURN relay credential is stored the same way, in `sip_accounts.turn_username` and
+`turn_credential`, for the same reason: the browser presents it to the relay to
+allocate a port, so a hashed one is a relay that refuses the allocation. It is
+plaintext at rest and readable by the browser, exactly like the SIP password. The
+mitigation is the shape of the credential rather than its storage — a coturn user
+that can allocate relays and nothing else, with `denied-peer-ip` ranges so a leaked
+one is not an open proxy into the rest of the network, and a short `min-port` /
+`max-port` window. Time-limited HMAC credentials (coturn `use-auth-secret`) expire
+on their own and are the better answer; they need a server-side secret to sign with,
+which a browser-only deployment does not have. See `docs/sip-providers.md`.
+
 In self-hosted API mode the same rules are enforced by `requireRole("admin")` on
 every write and by `requireProvisioned` on every read.
 
