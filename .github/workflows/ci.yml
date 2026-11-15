@@ -121,8 +121,25 @@ jobs:
           JWT_SECRET: ci-only-not-a-secret-0000000000000000000000
         run: |
           set -euo pipefail
-          docker compose -f docker/docker-compose.yml up -d --build
-          docker compose -f docker/docker-compose.yml ps
+          COMPOSE="docker compose -f docker/docker-compose.yml"
+
+          # Whatever fails, say what the containers were doing when it did.
+          #
+          # An earlier revision put diagnostics only at the end of the readiness
+          # loop, and the step failed before reaching it, so the annotation never
+          # fired and the run gave up its exit code and nothing else. Job logs are
+          # served from a different host than the API, so for anyone triaging this
+          # from the check run they are not there to read; annotations are.
+          diag() {
+            echo "::error title=failed at line ${1}::exit ${2}"
+            echo "::error title=compose ps::$(docker compose -f docker/docker-compose.yml ps -a 2>&1 | tr '\n' ' ' | head -c 900)"
+            echo "::error title=backend logs::$(docker compose -f docker/docker-compose.yml logs --tail=25 backend 2>&1 | tr '\n' ' ' | head -c 1400)"
+            echo "::error title=db logs::$(docker compose -f docker/docker-compose.yml logs --tail=15 db 2>&1 | tr '\n' ' ' | head -c 700)"
+          }
+          trap 'rc=$?; diag "${LINENO}" "${rc}" || true' ERR
+
+          $COMPOSE up -d --build
+          $COMPOSE ps
 
           # `ps` alone proves nothing: it lists exited containers too. Wait for the
           # API to answer /api/health/ready, which awaits `ensureSchema()` and
@@ -134,17 +151,11 @@ jobs:
               break
             fi
             if [ "$i" -eq 90 ]; then
-              # Emit the container logs as an annotation rather than only to stderr.
-              # Job logs live on a separate host from the API, so a failure that
-              # explains itself only in its log tail can be unreadable to whoever
-              # is triaging it from the timeline; an annotation is part of the
-              # check run and shows up on the PR either way.
-              logs=$(docker compose -f docker/docker-compose.yml logs --tail=40 backend 2>&1 | tr '\n' ' ' | tr -d '\r')
-              echo "::error title=backend never became ready::${logs}"
-              echo "::error title=compose ps::$(docker compose -f docker/docker-compose.yml ps -a 2>&1 | tr '\n' ' ' | tr -d '\r')"
+              echo "backend never became ready" >&2
               exit 1
             fi
             sleep 1
           done
 
-          docker compose -f docker/docker-compose.yml down -v
+          trap - ERR
+          $COMPOSE down -v
