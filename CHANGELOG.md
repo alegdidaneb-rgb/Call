@@ -167,6 +167,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   seeded administrator signs in as `seedadmin` rather than `admin@example.com`
 
 
+- **The self-hosted backend runs on Postgres instead of SQLite**, which is what
+  makes it deployable as a serverless function. Two separate problems, one fix:
+  `better-sqlite3` is a native addon with no prebuilt binary for the Node version
+  the platform runs, so `npm install` failed and the project had never once built;
+  and even had it compiled, SQLite needs a writable durable file, which a
+  serverless filesystem does not have — read-only outside `/tmp`, and `/tmp` does
+  not survive an instance. `DATABASE_URL` is now **required**, with no default,
+  because the file-backed store turned a typo'd environment into a working server
+  full of empty tables rather than an error
+- The backend's entrypoint is split in two: `src/app.ts` builds the Express app,
+  `src/index.ts` listens on a port for Docker and a VPS, and `api/index.ts` is the
+  Vercel handler. A module-scope `app.listen()` binds a port nothing routes to on a
+  platform that calls a function per request
+- `docker/Dockerfile.backend` no longer installs `python3`, `make` and `g++`. Those
+  were there only to compile the native addon, and their absence is the visible part
+  of why this build now succeeds where it did not
+- Compose runs Postgres as a service with a healthcheck the API waits on, replacing
+  the `backend-data` volume. Booting the API before the database accepts connections
+  meant the first cold start lost a race and exited
+- `npm run lint` now also runs `scripts/check-async-db.ts`, which looks for a
+  `Promise` used in a boolean position and for database calls nobody awaits. Both
+  are invisible to `tsc`: a Promise is an object, so `if (!row)` compiles and simply
+  never fires — which, on an authorisation check, is an inverted one that reports
+  success
+
+
 - Type, corner-radius and elevation are now scales rather than whatever each
   component reached for: eight text sizes with the line height attached, five
   radii, three shadows reading `var(--shadow-*)`. `rounded-md`, `rounded-2xl` and
@@ -275,6 +301,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The `admin-users` edge function rejected the deployment's own preview URLs. Its
+  allowed origins were an enumerated list that had to be edited every time Vercel
+  produced a new host, so each new branch silently lost the ability to create
+  accounts — the failure looked like a broken form rather than a missing origin. It
+  now matches this project's hosts by pattern (`cold-dialer-*.vercel.app`), which is
+  safe because a Vercel subdomain is globally unique to the project that owns it;
+  anything else goes in the `ADMIN_USERS_ALLOWED_ORIGINS` secret. A stale alias for a
+  deployment that no longer exists was dropped at the same time. `*.vercel.app` was
+  considered and rejected — over a shared domain it would let any project on the
+  platform call this function with a stolen administrator token
 - The same call outcome was two different colours depending on which screen you
   read it on: the badge painted `busy` red and `wrong_number` grey while
   `lib/outcomes` painted `busy` amber and `wrong_number` red

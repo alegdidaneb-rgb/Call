@@ -40,7 +40,11 @@ export function generateToken(userId: string): string {
  * into a 7-day token. Previously `userRole` was declared on AuthRequest but
  * never assigned, so no route could enforce roles at all.
  */
-export function authMiddleware(req: AuthRequest, res: Response, next: NextFunction): void {
+export async function authMiddleware(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) {
     res.status(401).json({ error: "Missing or invalid authorization header" });
@@ -63,7 +67,7 @@ export function authMiddleware(req: AuthRequest, res: Response, next: NextFuncti
     return;
   }
 
-  const profile = db
+  const profile = await db
     .prepare("SELECT id, username, email, role, invited_by FROM profiles WHERE id = ?")
     .get(payload.userId) as ProfileRow | undefined;
 

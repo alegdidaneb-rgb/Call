@@ -64,14 +64,14 @@ function mapAccount(row: any) {
  * a provider can block or bill individually. Mirrors the precedence the Supabase
  * client applies, so both deployment modes behave identically.
  */
-router.get("/effective", (req: AuthRequest, res) => {
+router.get("/effective", async (req: AuthRequest, res) => {
   const row =
-    db
+    await db
       .prepare(
         "SELECT * FROM sip_accounts WHERE enabled = 1 AND user_id = ? ORDER BY created_at LIMIT 1"
       )
       .get(req.userId) ??
-    db
+    await db
       .prepare(
         "SELECT * FROM sip_accounts WHERE enabled = 1 AND user_id IS NULL ORDER BY created_at LIMIT 1"
       )
@@ -80,12 +80,12 @@ router.get("/effective", (req: AuthRequest, res) => {
   res.json(row ? mapAccount(row) : null);
 });
 
-router.get("/", requireRole("admin"), (_req: AuthRequest, res) => {
-  const rows = db.prepare("SELECT * FROM sip_accounts ORDER BY created_at").all() as any[];
+router.get("/", requireRole("admin"), async (_req: AuthRequest, res) => {
+  const rows = await db.prepare("SELECT * FROM sip_accounts ORDER BY created_at").all() as any[];
   res.json(rows.map(mapAccount));
 });
 
-router.post("/", requireRole("admin"), (req: AuthRequest, res) => {
+router.post("/", requireRole("admin"), async (req: AuthRequest, res) => {
   const parsed = accountSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid SIP account" });
@@ -96,7 +96,7 @@ router.post("/", requireRole("admin"), (req: AuthRequest, res) => {
   const now = new Date().toISOString();
 
   try {
-    db.prepare(
+    await db.prepare(
       `INSERT INTO sip_accounts
         (id, user_id, label, provider, sip_uri, password, ws_url, caller_id,
          stun_urls, register_expiry, enabled, created_at, updated_at)
@@ -128,18 +128,18 @@ router.post("/", requireRole("admin"), (req: AuthRequest, res) => {
     return;
   }
 
-  const row = db.prepare("SELECT * FROM sip_accounts WHERE id = ?").get(id) as any;
+  const row = await db.prepare("SELECT * FROM sip_accounts WHERE id = ?").get(id) as any;
   res.status(201).json(mapAccount(row));
 });
 
-router.patch("/:id", requireRole("admin"), (req: AuthRequest, res) => {
+router.patch("/:id", requireRole("admin"), async (req: AuthRequest, res) => {
   const parsed = accountUpdateSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid SIP account" });
     return;
   }
 
-  const existing = db.prepare("SELECT * FROM sip_accounts WHERE id = ?").get(req.params.id) as any;
+  const existing = await db.prepare("SELECT * FROM sip_accounts WHERE id = ?").get(req.params.id) as any;
   if (!existing) {
     res.status(404).json({ error: "SIP account not found" });
     return;
@@ -193,15 +193,15 @@ router.patch("/:id", requireRole("admin"), (req: AuthRequest, res) => {
   if (columns.length > 0) {
     columns.push("updated_at = ?");
     values.push(new Date().toISOString(), req.params.id);
-    db.prepare(`UPDATE sip_accounts SET ${columns.join(", ")} WHERE id = ?`).run(...values);
+    await db.prepare(`UPDATE sip_accounts SET ${columns.join(", ")} WHERE id = ?`).run(...values);
   }
 
-  const row = db.prepare("SELECT * FROM sip_accounts WHERE id = ?").get(req.params.id) as any;
+  const row = await db.prepare("SELECT * FROM sip_accounts WHERE id = ?").get(req.params.id) as any;
   res.json(mapAccount(row));
 });
 
-router.delete("/:id", requireRole("admin"), (req: AuthRequest, res) => {
-  const result = db.prepare("DELETE FROM sip_accounts WHERE id = ?").run(req.params.id);
+router.delete("/:id", requireRole("admin"), async (req: AuthRequest, res) => {
+  const result = await db.prepare("DELETE FROM sip_accounts WHERE id = ?").run(req.params.id);
   if (result.changes === 0) {
     res.status(404).json({ error: "SIP account not found" });
     return;

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { v4 as uuid } from "uuid";
 import { z } from "zod";
 import db from "../db/database.js";
+import { withTransaction } from "../db/pool.js";
 import { authMiddleware, requireProvisioned, requireRole, isAdmin, type AuthRequest } from "../middleware/auth.js";
 import { MAX_IMPORT_ROWS } from "../config/env.js";
 
@@ -119,22 +120,22 @@ function mapLead(row: any) {
   };
 }
 
-router.get("/", (req: AuthRequest, res) => {
+router.get("/", async (req: AuthRequest, res) => {
   const { sql, params } = visibilityClause(req);
-  const rows = db
+  const rows = await db
     .prepare(`SELECT * FROM leads WHERE ${sql} ORDER BY created_at DESC LIMIT 1000`)
     .all(...params) as any[];
   res.json(rows.map(mapLead));
 });
 
-router.get("/:id", (req: AuthRequest, res) => {
-  const row = db.prepare("SELECT * FROM leads WHERE id = ?").get(req.params.id) as any;
+router.get("/:id", async (req: AuthRequest, res) => {
+  const row = await db.prepare("SELECT * FROM leads WHERE id = ?").get(req.params.id) as any;
   if (!row) {
     res.status(404).json({ error: "Lead not found" });
     return;
   }
   const { sql, params } = visibilityClause(req);
-  const visible = db
+  const visible = await db
     .prepare(`SELECT 1 FROM leads WHERE id = ? AND ${sql}`)
     .get(req.params.id, ...params);
   if (!visible) {
@@ -145,7 +146,7 @@ router.get("/:id", (req: AuthRequest, res) => {
   res.json(mapLead(row));
 });
 
-router.post("/", (req: AuthRequest, res) => {
+router.post("/", async (req: AuthRequest, res) => {
   const parsed = leadCreateSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid lead payload" });
@@ -162,7 +163,7 @@ router.post("/", (req: AuthRequest, res) => {
   const now = new Date().toISOString();
 
   try {
-    db.prepare(
+    await db.prepare(
       `INSERT INTO leads (id, first_name, last_name, company, phone, email, website, address, city, state, zip, country, status, source, campaign_id, assigned_to, created_by, tags, notes, dnc, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
@@ -195,12 +196,12 @@ router.post("/", (req: AuthRequest, res) => {
     return;
   }
 
-  const row = db.prepare("SELECT * FROM leads WHERE id = ?").get(id) as any;
+  const row = await db.prepare("SELECT * FROM leads WHERE id = ?").get(id) as any;
   res.status(201).json(mapLead(row));
 });
 
-router.patch("/:id", (req: AuthRequest, res) => {
-  const existing = db.prepare("SELECT * FROM leads WHERE id = ?").get(req.params.id) as any;
+router.patch("/:id", async (req: AuthRequest, res) => {
+  const existing = await db.prepare("SELECT * FROM leads WHERE id = ?").get(req.params.id) as any;
   if (!existing) {
     res.status(404).json({ error: "Lead not found" });
     return;
@@ -253,24 +254,24 @@ router.patch("/:id", (req: AuthRequest, res) => {
   values.push(req.params.id);
 
   try {
-    db.prepare(`UPDATE leads SET ${updates.join(", ")} WHERE id = ?`).run(...values);
+    await db.prepare(`UPDATE leads SET ${updates.join(", ")} WHERE id = ?`).run(...values);
   } catch (err) {
     console.error("[leads] update failed:", err);
     res.status(400).json({ error: "Unable to update lead" });
     return;
   }
 
-  const row = db.prepare("SELECT * FROM leads WHERE id = ?").get(req.params.id) as any;
+  const row = await db.prepare("SELECT * FROM leads WHERE id = ?").get(req.params.id) as any;
   res.json(mapLead(row));
 });
 
-router.delete("/:id", requireRole("admin"), (req: AuthRequest, res) => {
-  const existing = db.prepare("SELECT id FROM leads WHERE id = ?").get(req.params.id);
+router.delete("/:id", requireRole("admin"), async (req: AuthRequest, res) => {
+  const existing = await db.prepare("SELECT id FROM leads WHERE id = ?").get(req.params.id);
   if (!existing) {
     res.status(404).json({ error: "Lead not found" });
     return;
   }
-  db.prepare("DELETE FROM leads WHERE id = ?").run(req.params.id);
+  await db.prepare("DELETE FROM leads WHERE id = ?").run(req.params.id);
   res.status(204).end();
 });
 
@@ -295,7 +296,7 @@ const importSchema = z.object({
   campaign_id: z.string().uuid().nullish(),
 });
 
-router.post("/import", (req: AuthRequest, res) => {
+router.post("/import", async (req: AuthRequest, res) => {
   // Length is checked explicitly rather than via schema issue codes, so the
   // limit message does not depend on the validation library's internals.
   const rawRows = (req.body as { rows?: unknown } | undefined)?.rows;
@@ -321,23 +322,36 @@ router.post("/import", (req: AuthRequest, res) => {
 
   const { rows, campaign_id } = parsed.data;
 
-  const insert = db.prepare(
-    `INSERT INTO leads (id, first_name, last_name, company, phone, email, website, address, city, state, zip, country, status, source, campaign_id, assigned_to, created_by, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`
-  );
+  const INSERT_SQL = `INSERT INTO leads (id, first_name, last_name, company, phone, email, website, address, city, state, zip, country, status, source, campaign_id, assigned_to, created_by, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now())`;
 
   /**
-   * Per-row failures are now collected and reported instead of being swallowed
-   * by an empty catch block, which previously returned a success response while
-   * silently dropping rows.
+   * Per-row failures are collected and reported instead of being swallowed by an
+   * empty catch block, which previously returned a success response while silently
+   * dropping rows.
+   *
+   * Each row gets its own SAVEPOINT, and this is not a stylistic choice. In
+   * Postgres a statement that fails aborts the *whole* transaction, and every
+   * later statement is rejected with "current transaction is aborted" until it is
+   * rolled back. The SQLite version of this loop could catch a per-row error and
+   * carry on; ported naively, one malformed row would have poisoned the rest of
+   * the import and reported hundreds of bogus failures. Rolling back to the
+   * savepoint clears the error and leaves the rows that did succeed intact.
    */
-  const importMany = db.transaction((items: z.infer<typeof importRowSchema>[]) => {
+  const result = await withTransaction(async (tx) => {
     const errors: { row: number; reason: string }[] = [];
     let imported = 0;
+    // Set when the transaction itself becomes unusable, which is a different
+    // situation from one row being rejected. See the catch block below.
+    let fatal: unknown = null;
 
-    items.forEach((row, index) => {
+    for (let index = 0; index < rows.length; index += 1) {
+      const row = rows[index];
+      // Numeric suffix, so the identifier cannot carry anything from the payload.
+      const savepoint = `sp_${index}`;
+      await tx.exec(`SAVEPOINT ${savepoint}`);
       try {
-        insert.run(
+        await tx.prepare(INSERT_SQL).run(
           uuid(),
           row.first_name ?? null,
           row.last_name ?? null,
@@ -356,19 +370,34 @@ router.post("/import", (req: AuthRequest, res) => {
           req.userId ?? null,
           req.userId ?? null
         );
-        imported++;
+        await tx.exec(`RELEASE SAVEPOINT ${savepoint}`);
+        imported += 1;
       } catch (err) {
+        /**
+         * Restoring the savepoint is what clears the aborted-transaction state, so
+         * if *that* fails the transaction cannot carry another statement. Carrying
+         * on would produce one "current transaction is aborted" error per remaining
+         * row — the wall of meaningless failures the savepoints exist to prevent,
+         * burying the real cause under hundreds of copies of itself. Stop instead
+         * and let the outer rollback surface the original error.
+         */
+        try {
+          await tx.exec(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+        } catch {
+          fatal = err;
+          break;
+        }
         errors.push({
           row: index + 1,
           reason: err instanceof Error ? err.message : "Insert failed",
         });
       }
-    });
+    }
+
+    if (fatal) throw fatal;
 
     return { imported, errors };
   });
-
-  const result = importMany(rows);
   res.json({
     imported: result.imported,
     failed: result.errors.length,

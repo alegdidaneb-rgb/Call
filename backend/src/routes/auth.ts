@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { v4 as uuid } from "uuid";
 import { z } from "zod";
 import db from "../db/database.js";
+import { withTransaction } from "../db/pool.js";
 import { generateToken, authMiddleware, type AuthRequest } from "../middleware/auth.js";
 import { BCRYPT_ROUNDS } from "../config/env.js";
 import { normaliseUsername, syntheticEmail, usernameProblem } from "../lib/username.js";
@@ -79,9 +80,9 @@ function publicUser(row: ProfileRow) {
  * `GET /status` reports whether that exception still applies, so the sign-in
  * screen offers setup only when it would succeed. It discloses nothing else.
  */
-router.get("/status", (_req, res) => {
+router.get("/status", async (_req, res) => {
   try {
-    const row = db.prepare("SELECT COUNT(*) AS n FROM profiles").get() as { n: number };
+    const row = await db.prepare("SELECT COUNT(*) AS n FROM profiles").get() as { n: number };
     res.json({ needsSetup: row.n === 0 });
   } catch (err) {
     console.error("[auth] status failed:", err);
@@ -105,25 +106,32 @@ router.post("/bootstrap", async (req, res) => {
   const { username, password, fullName } = parsed.data;
 
   try {
-    // Hashing is async and better-sqlite3 transactions are not, so the hash is
-    // computed first; the transaction still does its own check-and-insert.
+    // Hashed before the transaction opens, not because the transaction is
+    // synchronous any more, but because bcrypt is deliberately slow: holding a
+    // pooled connection across it would keep a scarce connection idle while the
+    // CPU works.
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
     const id = uuid();
 
-    const bootstrap = db.transaction((): string | null => {
-      const existing = db.prepare("SELECT COUNT(*) AS n FROM profiles").get() as { n: number };
-      if (existing.n > 0) return null;
+    // Check-and-insert stays inside one transaction so two concurrent bootstraps
+    // cannot both see an empty table and both create an administrator.
+    const created = await withTransaction(async (tx): Promise<string | null> => {
+      const existing = await tx
+        .prepare("SELECT COUNT(*) AS n FROM profiles")
+        .get<{ n: number }>();
+      if ((existing?.n ?? 0) > 0) return null;
       // Self-adopted: there is no administrator yet to attribute it to.
       // The address is derived from the username: `email` is NOT NULL UNIQUE and
       // predates usernames, so it stays as the storage identity. Nothing mails it.
-      db.prepare(
-        "INSERT INTO profiles (id, username, email, full_name, password_hash, role, invited_by) " +
-          "VALUES (?, ?, ?, ?, ?, 'admin', ?)"
-      ).run(id, username, syntheticEmail(username), fullName ?? username, passwordHash, id);
+      await tx
+        .prepare(
+          "INSERT INTO profiles (id, username, email, full_name, password_hash, role, invited_by) " +
+            "VALUES (?, ?, ?, ?, ?, 'admin', ?)"
+        )
+        .run(id, username, syntheticEmail(username), fullName ?? username, passwordHash, id);
       return id;
     });
 
-    const created = bootstrap();
     if (!created) {
       res.status(409).json({
         error:
@@ -132,7 +140,7 @@ router.post("/bootstrap", async (req, res) => {
       return;
     }
 
-    const row = db
+    const row = await db
       .prepare(
         "SELECT id, username, email, full_name, role, password_hash, invited_by " +
           "FROM profiles WHERE id = ?"
@@ -167,7 +175,7 @@ router.post("/login", async (req, res) => {
     // A username is the normal path; an address still matches, for accounts that
     // predate usernames. Both are compared case-insensitively, the way the unique
     // index stores them.
-    const user = db
+    const user = await db
       .prepare(
         "SELECT id, username, email, full_name, role, password_hash, invited_by FROM profiles " +
           "WHERE lower(username) = lower(?) OR lower(email) = lower(?)"
@@ -198,8 +206,8 @@ router.post("/login", async (req, res) => {
   }
 });
 
-router.get("/me", authMiddleware, (req: AuthRequest, res) => {
-  const user = db
+router.get("/me", authMiddleware, async (req: AuthRequest, res) => {
+  const user = await db
     .prepare(
       "SELECT id, username, email, full_name, role, password_hash, invited_by " +
         "FROM profiles WHERE id = ?"

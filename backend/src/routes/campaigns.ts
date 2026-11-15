@@ -33,15 +33,15 @@ function mapCampaign(row: any) {
 }
 
 /** Campaigns are a shared team resource: readable by any authenticated member. */
-router.get("/", (_req, res) => {
-  const rows = db
+router.get("/", async (_req, res) => {
+  const rows = await db
     .prepare("SELECT * FROM campaigns ORDER BY created_at DESC LIMIT 500")
     .all() as any[];
   res.json(rows.map(mapCampaign));
 });
 
-router.get("/:id", (req, res) => {
-  const row = db.prepare("SELECT * FROM campaigns WHERE id = ?").get(req.params.id) as any;
+router.get("/:id", async (req, res) => {
+  const row = await db.prepare("SELECT * FROM campaigns WHERE id = ?").get(req.params.id) as any;
   if (!row) {
     res.status(404).json({ error: "Campaign not found" });
     return;
@@ -49,7 +49,7 @@ router.get("/:id", (req, res) => {
   res.json(mapCampaign(row));
 });
 
-router.post("/", (req: AuthRequest, res) => {
+router.post("/", async (req: AuthRequest, res) => {
   const parsed = campaignSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid campaign payload" });
@@ -60,7 +60,7 @@ router.post("/", (req: AuthRequest, res) => {
   const id = uuid();
   const now = new Date().toISOString();
 
-  db.prepare(
+  await db.prepare(
     "INSERT INTO campaigns (id, name, type, status, settings, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
   ).run(
     id,
@@ -73,12 +73,12 @@ router.post("/", (req: AuthRequest, res) => {
     now
   );
 
-  const row = db.prepare("SELECT * FROM campaigns WHERE id = ?").get(id) as any;
+  const row = await db.prepare("SELECT * FROM campaigns WHERE id = ?").get(id) as any;
   res.status(201).json(mapCampaign(row));
 });
 
-router.patch("/:id", (req: AuthRequest, res) => {
-  const existing = db.prepare("SELECT * FROM campaigns WHERE id = ?").get(req.params.id) as any;
+router.patch("/:id", async (req: AuthRequest, res) => {
+  const existing = await db.prepare("SELECT * FROM campaigns WHERE id = ?").get(req.params.id) as any;
   if (!existing) {
     res.status(404).json({ error: "Campaign not found" });
     return;
@@ -117,13 +117,13 @@ router.patch("/:id", (req: AuthRequest, res) => {
   values.push(new Date().toISOString());
   values.push(req.params.id);
 
-  db.prepare(`UPDATE campaigns SET ${updates.join(", ")} WHERE id = ?`).run(...values);
-  const row = db.prepare("SELECT * FROM campaigns WHERE id = ?").get(req.params.id) as any;
+  await db.prepare(`UPDATE campaigns SET ${updates.join(", ")} WHERE id = ?`).run(...values);
+  const row = await db.prepare("SELECT * FROM campaigns WHERE id = ?").get(req.params.id) as any;
   res.json(mapCampaign(row));
 });
 
-router.delete("/:id", requireRole("admin"), (req, res) => {
-  const result = db.prepare("DELETE FROM campaigns WHERE id = ?").run(req.params.id);
+router.delete("/:id", requireRole("admin"), async (req, res) => {
+  const result = await db.prepare("DELETE FROM campaigns WHERE id = ?").run(req.params.id);
   if (result.changes === 0) {
     res.status(404).json({ error: "Campaign not found" });
     return;

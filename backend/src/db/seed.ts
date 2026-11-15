@@ -1,4 +1,5 @@
 import db from "./database.js";
+import { closePool } from "./pool.js";
 import { v4 as uuid } from "uuid";
 import bcrypt from "bcryptjs";
 import { syntheticEmail } from "../lib/username.js";
@@ -52,7 +53,7 @@ function randomPhone(): string {
   return `+1${area}${mid}${last}`;
 }
 
-function seed() {
+async function seed() {
   console.log("Seeding database...");
 
   const userId = uuid();
@@ -71,7 +72,7 @@ function seed() {
   // account does not use it either: a fixture that signs in with a name the
   // product refuses to issue would be a misleading example. The email column is
   // still populated because it is NOT NULL, but nothing signs in with it.
-  db.prepare(
+  await db.prepare(
     "INSERT INTO profiles (id, username, email, full_name, password_hash, role) " +
       "VALUES (?, ?, ?, ?, ?, ?)"
   ).run(userId, SEED_USERNAME, syntheticEmail(SEED_USERNAME), "Admin User", passwordHash, "admin");
@@ -90,13 +91,13 @@ function seed() {
   for (const name of campaignNames) {
     const id = uuid();
     campaignIds.push(id);
-    db.prepare(
+    await db.prepare(
       "INSERT INTO campaigns (id, name, type, status, created_by) VALUES (?, ?, 'outbound', 'active', ?)"
     ).run(id, name, userId);
   }
 
   const scriptId = uuid();
-  db.prepare(
+  await db.prepare(
     "INSERT INTO call_scripts (id, title, category, content, objection_responses, created_by) VALUES (?, ?, ?, ?, ?, ?)"
   ).run(
     scriptId,
@@ -127,7 +128,7 @@ function seed() {
     const status = pick(STATUSES);
     const campaignId = campaignIds[i % campaignIds.length];
 
-    db.prepare(
+    await db.prepare(
       `INSERT INTO leads (id, first_name, last_name, company, phone, email, city, state, zip, status, source, campaign_id, assigned_to, created_by, call_count, dnc)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'import', ?, ?, ?, ?, ?)`
     ).run(
@@ -149,16 +150,14 @@ function seed() {
     );
   }
 
-  const leadIds = db
-    .prepare("SELECT id FROM leads LIMIT 5")
-    .all()
-    .map((r: any) => r.id);
+  const leadRows = await db.prepare("SELECT id FROM leads LIMIT 5").all<{ id: string }>();
+  const leadIds = leadRows.map((r) => r.id);
 
   for (const leadId of leadIds) {
     const outcome = pick(OUTCOMES);
-    db.prepare(
+    await db.prepare(
       `INSERT INTO call_logs (id, lead_id, user_id, direction, outcome, duration_seconds, notes, created_at)
-       VALUES (?, ?, ?, 'outbound', ?, ?, ?, datetime('now', '-' || ? || ' hours'))`
+       VALUES (?, ?, ?, 'outbound', ?, ?, ?, now() - make_interval(hours => ?))`
     ).run(
       uuid(),
       leadId,
@@ -173,4 +172,22 @@ function seed() {
   console.log("Seeded: 1 admin user, 2 campaigns, 1 script, 20 leads, 5 call logs");
 }
 
-seed();
+/**
+ * `pg` keeps sockets open, so an idle pool holds the event loop and the process
+ * never exits on its own. Under better-sqlite3 this script just ended when the last
+ * statement ran; ported unchanged it would print "Seeded:" and then hang forever,
+ * which looks exactly like a stuck migration. Closing the pool is what lets it
+ * finish.
+ *
+ * A failure exits non-zero rather than logging and returning 0, so a broken seed
+ * cannot pass in CI or a Docker build step.
+ */
+seed()
+  .then(async () => {
+    await closePool();
+  })
+  .catch(async (err) => {
+    console.error("Seed failed:", err);
+    await closePool().catch(() => {});
+    process.exitCode = 1;
+  });

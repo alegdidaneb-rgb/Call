@@ -41,8 +41,16 @@ is public by design, so **Row Level Security is the only access control**:
 Never ship the `service_role` or `sb_secret_*` key to the browser. Only
 `VITE_SUPABASE_URL` and the publishable/anon key belong in a `VITE_` variable.
 
-### Self-hosted API mode (Express + SQLite)
+### Self-hosted API mode (Express + Postgres)
 
+- `DATABASE_URL` is **required**, in every environment including development, and
+  there is no fallback. The server exits at startup if it is missing or is not a
+  `postgres://` URL. This is deliberate: the SQLite store this replaced created a
+  file wherever it was pointed, so a typo in the environment produced a *working*
+  server full of empty tables rather than an error. Failing loudly is the safer
+  default, and on a serverless platform there is no local file to fall back to.
+  Use a role scoped to this application's tables rather than the database
+  superuser, and keep the host off the public internet.
 - `JWT_SECRET` is **required** in production. The server exits at startup if it
   is missing, shorter than 32 characters, or set to a value published in this
   repository's history. See `backend/src/config/env.ts`.
@@ -50,6 +58,15 @@ Never ship the `service_role` or `sb_secret_*` key to the browser. Only
   `profiles.password_hash`. The hash is never returned by any endpoint.
 - Login is rate limited (20 requests / 15 min per IP), and failed logins return
   a generic message with uniform timing. There is no public signup endpoint.
+  **Caveat when deployed as a serverless function:** `express-rate-limit` counts
+  in process memory, so each lambda instance keeps its own counter and an attacker
+  who spreads requests across instances gets a multiple of the stated budget. It
+  still throttles a single instance, and the platform reuses warm ones, but it is
+  not the guarantee it was as one long-lived process. Closing the gap needs a
+  shared store (`rate-limit-redis`, `@upstash/ratelimit`) and therefore
+  infrastructure this deployment does not have. Recorded rather than papered over;
+  Supabase mode is unaffected, as it enforces auth limits at the platform.
+  The same applies to the 300/min global limiter.
 - Data routes additionally require `requireProvisioned`, so an account that
   authenticated but was never created by an administrator gets `403` rather than
   an empty result set that looks like a successful load.
@@ -234,7 +251,7 @@ Unused dependencies are removed rather than patched: `multer`, `papaparse` and
 the whole Drizzle layer (`drizzle-orm`, `drizzle-kit`, `src/db/schema.ts`) were
 declared but never imported by runtime code. Dropping Drizzle also removes a
 second, competing definition of the schema — the DDL in `src/db/database.ts` is
-now the single source of truth for SQLite.
+now the single source of truth for the self-hosted Postgres schema.
 
 ## Hardening Checklist for Production
 
@@ -244,5 +261,6 @@ now the single source of truth for SQLite.
 - [ ] Supabase migrations applied and RLS verified with
       `select relname, relrowsecurity from pg_class where relnamespace = 'public'::regnamespace;`
 - [ ] HTTPS enforced; SIP over `wss://` only
-- [ ] Filesystem permissions restrict access to the SQLite database file
+- [ ] `DATABASE_URL` credentials are not the database superuser, and the host is
+      not reachable from the public internet (API mode)
 - [ ] Dependencies audited (`npm audit`) and CodeQL enabled
