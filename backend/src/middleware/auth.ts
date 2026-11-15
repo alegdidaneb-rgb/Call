@@ -8,6 +8,13 @@ export type Role = "admin" | "agent" | "manager";
 export interface AuthRequest extends Request {
   userId?: string;
   userRole?: Role;
+  /** How the account signs in, and how it should be named in any log line. */
+  username?: string;
+  /**
+   * The stored Supabase-style identity. For accounts created since usernames
+   * landed it is a synthetic address that receives no mail; kept for audit
+   * trails, never shown.
+   */
   userEmail?: string;
   /** Whether an administrator has onboarded this account. */
   userProvisioned?: boolean;
@@ -15,6 +22,7 @@ export interface AuthRequest extends Request {
 
 interface ProfileRow {
   id: string;
+  username: string | null;
   email: string;
   role: Role;
   invited_by: string | null;
@@ -56,7 +64,7 @@ export function authMiddleware(req: AuthRequest, res: Response, next: NextFuncti
   }
 
   const profile = db
-    .prepare("SELECT id, email, role, invited_by FROM profiles WHERE id = ?")
+    .prepare("SELECT id, username, email, role, invited_by FROM profiles WHERE id = ?")
     .get(payload.userId) as ProfileRow | undefined;
 
   if (!profile) {
@@ -67,6 +75,7 @@ export function authMiddleware(req: AuthRequest, res: Response, next: NextFuncti
 
   req.userId = profile.id;
   req.userRole = profile.role;
+  req.username = profile.username ?? undefined;
   req.userEmail = profile.email;
   // Mirrors the database predicate `public.is_provisioned()`: privileged roles
   // are provisioned by definition, an agent only once an admin has adopted it.

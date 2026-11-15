@@ -150,7 +150,7 @@ export function PhoneSettingsPage() {
     return (id: string | null) => {
       if (!id) return "Shared trunk default";
       const profile = byId.get(id);
-      return profile?.fullName || profile?.email || "Unknown user";
+      return profile?.fullName || profile?.username || profile?.email || "Unknown user";
     };
   }, [profiles]);
 
@@ -408,7 +408,7 @@ export function PhoneSettingsPage() {
                   <option value="">Shared trunk default (everyone)</option>
                   {profiles.map((profile) => (
                     <option key={profile.id} value={profile.id}>
-                      {profile.fullName || profile.email || profile.id} ({profile.role})
+                      {profile.fullName || profile.username || profile.email || profile.id} · {profile.role}
                     </option>
                   ))}
                 </select>

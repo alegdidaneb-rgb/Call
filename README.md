@@ -121,9 +121,14 @@ npm run dev
 
 Open http://localhost:3000 — 20 sample leads pre-loaded.
 
-**Seeded login:** `admin@example.com`. The seed script uses the well-known
+**Seeded login:** the username `seedadmin`. The seed script uses the well-known
 development password `password123` unless `SEED_ADMIN_PASSWORD` is set, and warns
 when it does. Never run the seed against a reachable deployment without setting it.
+
+Accounts are addressed by username everywhere — sign-up, sign-in and the team
+roster. No email address is collected, and none is sent: see
+[SECURITY.md](SECURITY.md#usernames-and-sign-in) for what that costs and how a
+forgotten password is handled.
 
 ### Option 2: Docker
 

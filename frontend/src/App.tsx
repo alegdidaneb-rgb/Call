@@ -42,7 +42,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
   if (!user.provisioned) {
-    return <PendingActivation email={user.email} />;
+    return <PendingActivation username={user.username} />;
   }
   return <>{children}</>;
 }
@@ -54,7 +54,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
  * show empty tables that look like a successful load. Say plainly what is wrong
  * instead.
  */
-function PendingActivation({ email }: { email: string | null }) {
+function PendingActivation({ username }: { username: string | null }) {
   const navigate = useNavigate();
 
   async function handleSignOut() {
@@ -67,7 +67,7 @@ function PendingActivation({ email }: { email: string | null }) {
       <div className="max-w-md w-full bg-panel rounded-xl shadow-panel border border-line p-8 text-center">
         <h1 className="text-lg font-bold text-ink">Waiting for an administrator</h1>
         <p className="text-sm text-muted mt-2">
-          {email ? `The account ${email} ` : "This account "}
+          {username ? `The account ${username} ` : "This account "}
           can sign in, but it has not been given access to any data. Accounts are created and
           activated by an administrator from the Team page.
         </p>

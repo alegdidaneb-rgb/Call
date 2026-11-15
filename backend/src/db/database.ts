@@ -2,6 +2,7 @@ import Database, { type Database as DatabaseType } from "better-sqlite3";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import { usernameFromEmail } from "../lib/username.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = process.env.DATA_DIR
@@ -18,9 +19,14 @@ const db: DatabaseType = new Database(DB_PATH);
 db.pragma("journal_mode = WAL");
 db.pragma("foreign_keys = ON");
 
+// `profiles.username` is what an account signs in with. It is declared here
+// without a constraint and enforced by the unique index in migrate(), so a fresh
+// database and one upgraded by ALTER TABLE end up with identical rules instead of
+// two subtly different schemas.
 db.exec(`
   CREATE TABLE IF NOT EXISTS profiles (
     id TEXT PRIMARY KEY,
+    username TEXT,
     email TEXT NOT NULL UNIQUE,
     full_name TEXT,
     password_hash TEXT,
@@ -209,12 +215,17 @@ function migrate(): void {
     db.exec("CREATE INDEX IF NOT EXISTS idx_leads_created_by ON leads(created_by)");
   }
 
+  // Accounts are addressed by username, so it has to exist on every row before
+  // the unique index can be built.
+  if (!columnExists("profiles", "username")) {
+    db.exec("ALTER TABLE profiles ADD COLUMN username TEXT");
+    console.warn("[db] Added missing profiles.username column; deriving one for every account.");
+  }
+
+  backfillUsernames();
+
   // Pre-existing rows may duplicate emails; the UNIQUE index only applies to new tables.
-  const emailIndexes = db
-    .prepare("PRAGMA index_list(profiles)")
-    .all() as { name: string; unique: number }[];
-  const hasUniqueEmail = emailIndexes.some((i) => i.unique === 1);
-  if (!hasUniqueEmail) {
+  if (!hasUniqueIndexOn("profiles", "email")) {
     try {
       db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_email ON profiles(email)");
     } catch (err) {
@@ -224,6 +235,92 @@ function migrate(): void {
         }`
       );
     }
+  }
+
+  // Case-insensitive, matching the Postgres deployment's `lower(username)` index:
+  // `Marco` and `marco` must not be two accounts.
+  if (!hasUniqueIndexOn("profiles", "lower(username)")) {
+    try {
+      db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_username ON profiles(lower(username))");
+    } catch (err) {
+      console.warn(
+        `[db] Could not enforce unique usernames on profiles: ${
+          err instanceof Error ? err.message : String(err)
+        }`
+      );
+    }
+  }
+}
+
+/**
+ * True when some unique index on `table` covers exactly `expression`.
+ *
+ * Checks the indexed expression rather than "does any unique index exist": the
+ * previous version of this test did the latter, and would have stopped enforcing
+ * unique emails as soon as any other unique index was added to the table.
+ */
+function hasUniqueIndexOn(table: string, expression: string): boolean {
+  const indexes = db.prepare(`PRAGMA index_list(${table})`).all() as {
+    name: string;
+    unique: number;
+  }[];
+  const wanted = expression.toLowerCase().replace(/\s+/g, "");
+  return indexes.some((index) => {
+    if (index.unique !== 1) return false;
+    const columns = db.prepare(`PRAGMA index_info(${index.name})`).all() as {
+      name: string | null;
+    }[];
+    if (columns.length !== 1) return false;
+    // `name` is null for an expression index; its text only appears in the DDL.
+    const direct = columns[0]?.name?.toLowerCase();
+    if (direct) return direct === wanted;
+    const ddl = db
+      .prepare("SELECT sql FROM sqlite_master WHERE type = 'index' AND name = ?")
+      .get(index.name) as { sql: string | null } | undefined;
+    return (ddl?.sql ?? "").toLowerCase().replace(/\s+/g, "").includes(`(${wanted})`);
+  });
+}
+
+/**
+ * Give every row without a username one derived from its stored email.
+ *
+ * Mirrors `public.derive_username` in migration 005, including collision
+ * avoidance: an address is not guaranteed to produce a name that is free, and
+ * failing here would leave the unique index unbuildable and the deployment unable
+ * to sign in at all.
+ */
+function backfillUsernames(): void {
+  const rows = db
+    .prepare("SELECT id, email, username FROM profiles")
+    .all() as { id: string; email: string | null; username: string | null }[];
+
+  const taken = new Set(
+    rows.map((r) => r.username?.toLowerCase()).filter((u): u is string => Boolean(u))
+  );
+
+  const update = db.prepare("UPDATE profiles SET username = ? WHERE id = ?");
+  let backfilled = 0;
+
+  for (const row of rows) {
+    if (row.username) continue;
+
+    const base = usernameFromEmail(row.email) ?? "user";
+    let candidate = base;
+    let n = 1;
+    while (taken.has(candidate)) {
+      n += 1;
+      candidate = `${base}${n}`;
+    }
+    taken.add(candidate);
+    update.run(candidate, row.id);
+    backfilled += 1;
+  }
+
+  if (backfilled > 0) {
+    console.warn(
+      `[db] Derived usernames for ${backfilled} existing account(s). Sign-in now accepts a ` +
+        "username; a stored email is still accepted so nobody is locked out."
+    );
   }
 }
 

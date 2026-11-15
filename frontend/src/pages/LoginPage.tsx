@@ -1,25 +1,32 @@
 import { useEffect, useId, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { AlertCircle, CheckCircle2, LogIn, Mail } from "lucide-react";
+import { AlertCircle, CheckCircle2, LogIn, User } from "lucide-react";
 import { z } from "zod";
 import { AuthScreen } from "@/components/auth/AuthScreen";
 import { PasswordField } from "@/components/auth/PasswordField";
 import { fetchSetupStatus, signIn } from "@/lib/auth";
 
+/**
+ * The field accepts a username, and still accepts an address so that accounts
+ * created before usernames existed are not locked out. Validation is therefore
+ * deliberately loose here: `resolveLoginEmail` decides, and a wrong username
+ * should come back as "no account uses that username" rather than as a
+ * client-side complaint about the shape of what was typed.
+ */
 const loginSchema = z.object({
-  email: z.string().email("Enter a valid email address"),
+  identifier: z.string().trim().min(1, "Enter your username"),
   password: z.string().min(1, "Enter your password"),
 });
 
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const emailId = useId();
+  const usernameId = useId();
   const justCreated = Boolean((location.state as { created?: boolean } | null)?.created);
 
   /** Only a deployment with no accounts at all offers the setup screen. */
   const [needsSetup, setNeedsSetup] = useState(false);
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -46,7 +53,7 @@ export function LoginPage() {
     setError("");
     setFieldErrors({});
 
-    const result = loginSchema.safeParse({ email, password });
+    const result = loginSchema.safeParse({ identifier, password });
     if (!result.success) {
       const errs: Record<string, string> = {};
       for (const issue of result.error.issues) {
@@ -59,7 +66,7 @@ export function LoginPage() {
 
     setLoading(true);
     try {
-      await signIn(email, password);
+      await signIn(identifier, password);
       navigate("/workspace");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign in failed");
@@ -71,7 +78,7 @@ export function LoginPage() {
     <AuthScreen
       tagline="Outbound calling for teams that work a list"
       title="Sign in"
-      description="Use the account an administrator created for you."
+      description="Sign in with the username an administrator gave you."
       footer={
         needsSetup ? (
           <p>
@@ -110,28 +117,31 @@ export function LoginPage() {
         ) : null}
 
         <div>
-          <label className="label" htmlFor={emailId}>
-            Email
+          <label className="label" htmlFor={usernameId}>
+            Username
           </label>
           <div className="relative">
-            <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
+            <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
             <input
-              id={emailId}
-              name="email"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              autoComplete="email"
-              placeholder="you@company.com"
+              id={usernameId}
+              name="username"
+              type="text"
+              value={identifier}
+              onChange={(event) => setIdentifier(event.target.value)}
+              autoComplete="username"
+              placeholder="your-username"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               autoFocus
-              aria-invalid={Boolean(fieldErrors.email)}
-              aria-describedby={fieldErrors.email ? `${emailId}-error` : undefined}
-              className={`input !pl-9 ${fieldErrors.email ? "!border-danger/50" : ""}`}
+              aria-invalid={Boolean(fieldErrors.identifier)}
+              aria-describedby={fieldErrors.identifier ? `${usernameId}-error` : undefined}
+              className={`input !pl-9 ${fieldErrors.identifier ? "!border-danger/50" : ""}`}
             />
           </div>
-          {fieldErrors.email ? (
-            <p id={`${emailId}-error`} className="mt-1 text-xs text-danger" role="alert">
-              {fieldErrors.email}
+          {fieldErrors.identifier ? (
+            <p id={`${usernameId}-error`} className="mt-1 text-xs text-danger" role="alert">
+              {fieldErrors.identifier}
             </p>
           ) : null}
         </div>

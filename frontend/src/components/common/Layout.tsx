@@ -101,7 +101,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }
 
   const ThemeIcon = theme === "system" ? Monitor : resolvedTheme === "dark" ? Moon : Sun;
-  const initials = (user?.fullName ?? user?.email ?? "U")
+  // `username`, not `email`: for an account created since usernames landed the
+  // address is synthetic, and showing it would leak an implementation detail into
+  // the one place every operator looks.
+  const initials = (user?.fullName ?? user?.username ?? "U")
     .split(/[\s@]+/)
     .filter(Boolean)
     .slice(0, 2)
@@ -182,7 +185,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-ink">
-                {user?.fullName ?? user?.email ?? "User"}
+                {user?.fullName ?? user?.username ?? "User"}
               </p>
               <p className="truncate text-2xs capitalize text-faint">{role}</p>
             </div>

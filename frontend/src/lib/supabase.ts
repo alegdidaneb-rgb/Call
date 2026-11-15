@@ -57,6 +57,13 @@ const noopSubscription = {
 
 const unconfiguredClient = {
   from: (_table: string) => createUnconfiguredBuilder(),
+  // Sign-in resolves a username through a database function, so the stub has to
+  // answer `.rpc` too; without it a misconfigured deployment throws a TypeError
+  // on the login form instead of explaining itself.
+  rpc: async (_fn: string, _params?: unknown) => ({
+    data: null,
+    error: { message: NOT_CONFIGURED_MESSAGE },
+  }),
   channel: (_name: string) => ({
     on: () => ({ subscribe: () => {} }),
     subscribe: () => {},
