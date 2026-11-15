@@ -200,6 +200,64 @@ router.post("/", async (req: AuthRequest, res) => {
   res.status(201).json(mapLead(row));
 });
 
+const assignSchema = z.object({
+  // Bounded because this is one statement over a caller-supplied list: an
+  // unbounded array is a way to make a single request do unbounded work.
+  lead_ids: z.array(z.string().min(1).max(64)).min(1).max(5_000),
+  // Null is the meaningful case: it takes the leads back into the pool that
+  // everybody can see and claim.
+  assigned_to: z.string().min(1).max(64).nullable(),
+});
+
+/**
+ * Hands a set of leads to one person, or takes them back.
+ *
+ * Administrators and managers only. An agent may still claim an unassigned lead
+ * through `PATCH /:id`, which is what `canMutate` allows and what the row-level
+ * policies on the Supabase side allow; reassigning work between people is a
+ * different act and belongs to whoever owns the roster.
+ *
+ * `= ANY(?)` rather than a built placeholder list: `pg` sends a JavaScript array
+ * as a Postgres array, so the statement has a fixed shape whatever the size of
+ * the selection. A generated `IN (?, ?, ...)` would work too, but its SQL is
+ * different on every call, which defeats statement caching and means the shape
+ * cannot be checked once.
+ *
+ * One statement for the whole selection because the alternative is a partially
+ * applied assignment: a loop that fails on row 300 of 500 leaves the batch
+ * split between two owners with nothing recording which half moved.
+ */
+router.post("/assign", requireRole("admin", "manager"), async (req: AuthRequest, res) => {
+  const parsed = assignSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid assignment" });
+    return;
+  }
+  const { lead_ids: leadIds, assigned_to: assignedTo } = parsed.data;
+
+  if (assignedTo) {
+    // Checked before the write rather than left to the foreign key. The key
+    // would refuse it too, but as a constraint violation that reaches the client
+    // as a 500 naming a column instead of a 400 naming the problem.
+    const person = (await db
+      .prepare("SELECT id FROM profiles WHERE id = ?")
+      .get(assignedTo)) as { id?: string } | undefined;
+    if (!person) {
+      res.status(400).json({ error: "There is no such person to assign these leads to" });
+      return;
+    }
+  }
+
+  const result = await db
+    .prepare("UPDATE leads SET assigned_to = ?, updated_at = now() WHERE id = ANY(?)")
+    .run(assignedTo, leadIds);
+
+  // Fewer rows changed than were asked for is not an error — some ids may have
+  // been deleted since the grid rendered — but the caller should be able to see
+  // it rather than assume every lead moved.
+  res.json({ assigned: result.changes, requested: leadIds.length, assigned_to: assignedTo });
+});
+
 router.patch("/:id", async (req: AuthRequest, res) => {
   const existing = await db.prepare("SELECT * FROM leads WHERE id = ?").get(req.params.id) as any;
   if (!existing) {

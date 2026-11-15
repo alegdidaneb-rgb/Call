@@ -208,6 +208,19 @@ export const api = {
     update: (id: string, data: LeadUpdate) => patch<LeadRow>(`/api/leads/${id}`, data),
     delete: (id: string) => remove(`/api/leads/${id}`),
     /**
+     * Hands a set of leads to one person, or takes them back with `null`.
+     *
+     * One call for the whole selection rather than one per lead: assigning a
+     * five-hundred-row import is the normal case, and a per-row loop is five
+     * hundred round trips that each invalidate the list and re-render the grid
+     * partway through.
+     */
+    assign: (leadIds: string[], assignedTo: string | null) =>
+      post<{ assigned: number; assigned_to: string | null }>("/api/leads/assign", {
+        lead_ids: leadIds,
+        assigned_to: assignedTo,
+      }),
+    /**
      * `campaignId` is optional on the server; omitting it imports unattributed
      * leads, which then cannot be reported on per campaign.
      */

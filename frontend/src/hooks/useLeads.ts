@@ -81,6 +81,57 @@ export function useUpdateLead() {
   });
 }
 
+export interface AssignLeadsVariables {
+  leadIds: string[];
+  /** `null` takes the leads back into the unassigned pool. */
+  assignedTo: string | null;
+}
+
+/**
+ * Assigns a set of leads to one person, in a single write.
+ *
+ * Not built on `useUpdateLead` per lead. Distributing an import is the ordinary
+ * case here — five hundred leads split between five agents — and a loop is five
+ * hundred round trips, each invalidating the list and re-rendering the grid while
+ * it goes. It would also be partially applied on failure, leaving an assignment
+ * half-finished with no way to tell which half.
+ *
+ * Both deployment modes do it in one statement: `.in()` on Supabase, `= ANY($2)`
+ * on the Express API.
+ */
+export interface AssignLeadsResult {
+  /** Rows that actually changed. */
+  changed: number;
+  /** Rows asked for. The two differ when a lead was deleted elsewhere meanwhile. */
+  requested: number;
+}
+
+export function useAssignLeads() {
+  const queryClient = useQueryClient();
+  return useMutation<AssignLeadsResult, Error, AssignLeadsVariables>({
+    mutationFn: async ({ leadIds, assignedTo }): Promise<AssignLeadsResult> => {
+      if (leadIds.length === 0) return { changed: 0, requested: 0 };
+      if (isApiMode) {
+        const result = await api.leads.assign(leadIds, assignedTo);
+        return { changed: result.assigned, requested: leadIds.length };
+      }
+      const { data, error } = await supabase
+        .from("leads")
+        .update({ assigned_to: assignedTo })
+        .in("id", leadIds)
+        .select();
+      if (error) throw error;
+      return { changed: (data ?? []).length, requested: leadIds.length };
+    },
+    onSuccess: () => {
+      // The dialling queue derives from `useLeads` rather than fetching anything
+      // of its own, so this one invalidation reaches it: an agent's next lead to
+      // call depends on who owns it.
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+    },
+  });
+}
+
 /**
  * Bulk insert, for CSV imports.
  *

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { api, isApiMode } from "@/lib/apiClient";
-import { isProvisioned, normaliseRole, type AppRole } from "@/types/app";
+import { useAssignablePeople } from "./usePeople";
 import { supabase } from "@/lib/supabase";
 import {
   SIP_PROVIDERS,
@@ -18,30 +18,10 @@ import type { Database } from "@/types/database";
 
 type SipAccountRow = Database["public"]["Tables"]["sip_accounts"]["Row"];
 
-/**
- * Someone a trunk can be assigned to.
- *
- * The two deployment modes return different field names for the same person:
- * Supabase gives a `profiles` row with `full_name`, the Express API gives the
- * public user shape with `fullName`. This hook used to declare the Supabase type
- * and cast the API response into it, so in API mode `full_name` was always
- * undefined and the assignment dropdown quietly showed email addresses instead
- * of names. Normalising here means neither caller can be wrong.
- */
-export interface AssignablePerson {
-  id: string;
-  /** What the trunk-assignment dropdown shows; `email` is only a last resort. */
-  username: string | null;
-  email: string | null;
-  fullName: string | null;
-  role: AppRole;
-  /**
-   * Whether an administrator has onboarded this account. An unprovisioned agent
-   * can read no data under RLS, so assigning a trunk to one is a no-op and the
-   * Administration page reports it.
-   */
-  provisioned: boolean;
-}
+// `AssignablePerson` moved to `hooks/usePeople.ts`, where lead assignment shares
+// it. Re-exported so an import from here keeps working.
+export type { AssignablePerson } from "./usePeople";
+
 
 export interface SipAccountPayload {
   label: string | null;
@@ -215,37 +195,8 @@ export function useSipAccountsAdmin() {
     },
   });
 
-  const profiles = useQuery({
-    queryKey: ["profiles-for-assignment"],
-    queryFn: async (): Promise<AssignablePerson[]> => {
-      if (isApiMode) {
-        const users = await api.users.list();
-        return users.map((user) => ({
-          id: user.id,
-          username: user.username,
-          email: user.email,
-          fullName: user.fullName,
-          role: user.role,
-          provisioned: user.provisioned,
-        }));
-      }
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, username, email, full_name, role, invited_by");
-      if (error) throw error;
-      return (data ?? []).map((row) => {
-        const role = normaliseRole(row.role);
-        return {
-          id: row.id,
-          username: row.username,
-          email: row.email,
-          fullName: row.full_name,
-          role,
-          provisioned: isProvisioned(role, row.invited_by),
-        };
-      });
-    },
-  });
+  // One fetch shared with the leads screen: both ask who can be given work.
+  const profiles = useAssignablePeople();
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["sip-accounts"] });

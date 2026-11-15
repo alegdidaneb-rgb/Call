@@ -36,6 +36,15 @@ is public by design, so **Row Level Security is the only access control**:
 - Triggers normalise `created_by` / `user_id` to `auth.uid()` so a client cannot
   attribute rows to another user.
 - A trigger prevents non-admins from changing their own `role`.
+- A second trigger, `protect_lead_assignment()` (migration 007), restricts
+  `leads.assigned_to`. RLS alone was not enough: an agent may update a lead they
+  created, and `WITH CHECK` passes for such a row on `created_by = auth.uid()`
+  whatever `assigned_to` is set to, so an agent could hand their own lead to
+  somebody else or take one back from a colleague. The trigger leaves agents two
+  acts — claiming an unassigned lead, and releasing one of their own — and refuses
+  everything else with `Only an admin or manager can assign a lead to somebody
+  else`. It applies to `anon`/`authenticated` only; see the note below on why
+  `is_service_role()` is the wrong gate for a server-side connection.
 - The `anon` role has no table grants at all.
 
 Never ship the `service_role` or `sb_secret_*` key to the browser. Only
@@ -74,6 +83,13 @@ Never ship the `service_role` or `sb_secret_*` key to the browser. Only
 - Every route is scoped to the authenticated user, and destructive operations
   (`DELETE /leads/:id`, `DELETE /campaigns/:id`, `DELETE /scripts/:id`) require
   the `admin` role.
+- Reassignment is privileged: `POST /leads/assign` requires `admin` or `manager`,
+  and `PATCH /leads/:id` refuses an `assigned_to` naming anybody but the caller
+  unless they hold one of those roles. This is the application-layer twin of the
+  migration 007 trigger, and the reason that trigger must not be gated on
+  `is_service_role()` — that helper reads the JWT claims GUC, and a direct
+  `DATABASE_URL` connection has none, so gating on it would refuse every
+  assignment an administrator made through this API.
 - CSV import is capped at `MAX_IMPORT_ROWS` (default 1000) and reports per-row
   failures instead of silently dropping them.
 

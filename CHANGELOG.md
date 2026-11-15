@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Administrators can assign leads to agents.** The Lead list grows an *Owner*
+  column with a picker in each row, an owner filter, and *Assign to…* in the bulk
+  bar for a selection of any size; the lead detail page grows an Assignment card.
+  Clearing the owner returns a lead to the unassigned pool, which everybody can see
+  and claim. Restricted to administrators and managers — the roles the row-level
+  policies already treated as privileged — and shown to agents as a name rather than
+  a control they would be refused
+- `POST /api/leads/assign` takes `{lead_ids, assigned_to}` and assigns in one
+  statement, reporting how many rows actually changed so a selection that partly
+  vanished is reported honestly rather than as a clean success
+- **Migration 007** adds `public.protect_lead_assignment()`, so an agent may claim
+  an unassigned lead and release one of their own, but may not name another person
+  or move a lead that is already somebody's. The Express API has always refused
+  that; production runs against row-level security, where `WITH CHECK` passed for a
+  lead on `created_by = auth.uid()` whatever `assigned_to` was set to, so the
+  stricter rule existed only in the deployment nobody uses. The trigger governs
+  `anon` and `authenticated` and leaves direct server connections alone — a
+  self-hosted API has no JWT claims, and gating on `is_service_role()` would have
+  refused every assignment an administrator made through it
 - **TURN relay support** — migration 006 adds `turn_urls`, `turn_username` and
   `turn_credential` to `sip_accounts`, and the softphone now offers them to WebRTC
   alongside STUN. STUN only reports a browser's public address, so when both ends
@@ -330,6 +349,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Administrators had **no way to assign a lead** to an agent. `leads.assigned_to`
+  has existed since migration 001, the policies permitted writing it, and the API
+  accepted it — but no `.tsx` file in the frontend referenced the column, so there
+  was nothing to click and every lead sat in the shared pool
+- The owner of a lead was invisible even to those who could see it. An agent cannot
+  read the roster, so an owner's id resolves to nothing for them; the grid now says
+  "You", "Assigned" or a real name according to what that reader is permitted to
+  know, instead of labelling every assigned lead "Removed user"
 - Creating an account failed with **"Failed to send a request to the Edge
   Function"** — the Supabase client's `FunctionsFetchError`, meaning `fetch` itself
   failed and no response was readable. The `admin-users` function imported the
