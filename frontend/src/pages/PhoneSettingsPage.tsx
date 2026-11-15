@@ -524,7 +524,7 @@ export function PhoneSettingsPage() {
                 label="WebSocket URL"
                 hint={
                   form.provider === "custom"
-                    ? "The PBX or WebRTC gateway the browser talks to, e.g. wss://pbx.example.com:8089/ws. A trunk such as Bitcall (gateway.bitcall.io on 5060/udp) belongs in the SIP URI field above, never here."
+                    ? "The PBX or WebRTC gateway the browser talks to, e.g. wss://pbx.example.com:8089/ws for Asterisk. Ports differ per PBX — FreeSWITCH answers SIP over WebSocket on 7443 and has its own provider entry above, which fills this in correctly. A trunk such as Bitcall (gateway.bitcall.io on 5060/udp) belongs in the SIP URI field above, never here."
                     : SIP_PRESETS[form.provider].browserReady
                       ? `Where the browser connects, e.g. ${SIP_PRESETS[form.provider].example.wsUrl}`
                       : `A PBX or gateway you run, e.g. ${SIP_PRESETS[form.provider].example.wsUrl} — not the provider's SIP domain`

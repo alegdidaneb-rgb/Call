@@ -60,6 +60,15 @@ the provider, or whether a PBX or gateway has to sit in between.
 saved without filing it under "Other". The preset carries the gateway requirement
 and the coturn note with it.
 
+**FreeSWITCH** is a preset as of migration 008, and for a reason worth knowing if
+you ever debug a registration by hand: it listens on **7443**, while the generic
+"Other" entry derives **8089**, which is Asterisk's port. Filing FreeSWITCH under
+"Other" and leaving the WebSocket field blank therefore produced a URL with nothing
+listening on it, reported as a transport failure. See
+[`docs/freeswitch-webrtc.md`](./freeswitch-webrtc.md) for a full runbook, including
+the free test destinations that let you verify the media path without paying for a
+call.
+
 Exact endpoints change; treat the values below as a starting point and confirm
 them in your provider's console, then verify with **Test connection**. The Phone
 page deliberately does not guess a WebSocket URL for a provider that has no
@@ -118,6 +127,11 @@ Twilio instead of suggesting `wss://<your-domain>.sip.twilio.com`, which cannot
 connect.
 
 ### Your own PBX: Asterisk, FreeSWITCH, 3CX
+
+> Running FreeSWITCH specifically? [`docs/freeswitch-webrtc.md`](./freeswitch-webrtc.md)
+> is a full runbook: free hosting options, the four settings that decide whether it
+> works, the dialplan hook this app needs, and the built-in test numbers that prove
+> the media path for nothing. This section stays the general PBX reference.
 
 A PBX has three settings that decide whether a browser can register, and getting
 any one of them wrong produces the same vague symptom: the softphone reports
@@ -199,9 +213,15 @@ max_contacts = 5
 remove_existing = yes
 ```
 
-**FreeSWITCH.** The internal profile listens for WSS on port 7443 by default;
-confirm `wss-binding` is set and that `/etc/freeswitch/tls/wss.pem` holds a
-trusted certificate rather than the shipped self-signed one.
+**FreeSWITCH.** The internal profile binds `wss-binding :7443` and `ws-binding
+:5066` in the configuration it ships — both live and uncommented, so nothing needs
+enabling. Confirm `/etc/freeswitch/tls/wss.pem` holds a *trusted* certificate:
+FreeSWITCH generates a self-signed one if the file is missing, which is why WSS
+appears to work while the browser silently refuses it. Also check `domain` (defaults
+to the local IP) and `external_rtp_ip` / `external_sip_ip` (default to
+`stun:stun.freeswitch.org`), both of which must name your real public address or
+media goes somewhere it cannot return from. Full detail in
+[`docs/freeswitch-webrtc.md`](./freeswitch-webrtc.md).
 
 **3CX.** Its own web client uses WebRTC, but a *third-party* browser softphone is
 a different matter and several editions restrict which clients may register. If
@@ -392,7 +412,7 @@ Then in Cold Dialer → **Phone**:
 
 | Field | Value |
 | --- | --- |
-| Provider | Other (Asterisk, FreeSWITCH, 3CX, Bitcall gateway, ...) |
+| Provider | Bitcall (through its WebRTC-SIP gateway) |
 | SIP URI | `sip:<bitcall-sip-username>@gateway.bitcall.io` |
 | Password | your Bitcall SIP password |
 | WebSocket URL | `wss://<your-gateway-domain>/` |

@@ -268,7 +268,7 @@ export type Database = {
           id: string;
           user_id: string | null;
           label: string | null;
-          provider: "signalwire" | "telnyx" | "twilio" | "bitcall" | "custom";
+          provider: "signalwire" | "telnyx" | "twilio" | "bitcall" | "freeswitch" | "custom";
           sip_uri: string;
           password: string;
           ws_url: string;
@@ -286,7 +286,7 @@ export type Database = {
           id?: string;
           user_id?: string | null;
           label?: string | null;
-          provider?: "signalwire" | "telnyx" | "twilio" | "bitcall" | "custom";
+          provider?: "signalwire" | "telnyx" | "twilio" | "bitcall" | "freeswitch" | "custom";
           sip_uri: string;
           password: string;
           ws_url: string;
@@ -302,7 +302,7 @@ export type Database = {
         };
         Update: {
           label?: string | null;
-          provider?: "signalwire" | "telnyx" | "twilio" | "bitcall" | "custom";
+          provider?: "signalwire" | "telnyx" | "twilio" | "bitcall" | "freeswitch" | "custom";
           sip_uri?: string;
           password?: string;
           ws_url?: string;
