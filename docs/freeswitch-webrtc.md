@@ -223,7 +223,9 @@ and a local number has its country's dialling code prefixed. **There is always a
 leading `+`.** So a lead whose phone is `+9196` arrives at FreeSWITCH as
 destination `+9196`, which does not match the vanilla dialplan's `^9196$`.
 
-Add this to `conf/dialplan/default.xml`, above the extensions it should feed:
+Add this to `/etc/freeswitch/dialplan/default.xml` — the installed copy of what
+the source tree calls `conf/vanilla/dialplan/default.xml` — above the extensions
+it should feed:
 
 ```xml
 <extension name="cold_dialer_short_codes">
@@ -283,8 +285,10 @@ failures that otherwise look identical.
 
 ## Free test destinations
 
-All verified against the vanilla `conf/dialplan/default.xml`. With the short-code
-hook above, dial them by creating a lead whose phone is `+9196` and so on.
+All read out of the dialplan FreeSWITCH ships (`conf/vanilla/dialplan/default.xml`
+in the source tree, `/etc/freeswitch/dialplan/default.xml` once installed), not
+out of a guide. With the short-code hook above, dial them by creating a lead
+whose phone is `+9196` and so on.
 
 | Dial | Name | What it proves |
 | --- | --- | --- |
