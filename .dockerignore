@@ -1,0 +1,14 @@
+# The build context is the repository root, because both Dockerfiles copy
+# `backend/` and `frontend/` and `docker/nginx.conf` from there.
+#
+# node_modules matters most: a developer running compose locally has one built for
+# their host platform, and COPY would carry it into a linux/amd64 image where the
+# native parts do not load. The images install their own with `npm ci`.
+.git
+.github
+**/node_modules
+**/dist
+backend/data
+**/.env
+.env
+*.log

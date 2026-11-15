@@ -12,9 +12,29 @@ import {
 const router = Router();
 router.use(authMiddleware, requireProvisioned);
 
-const PROVIDERS = ["signalwire", "telnyx", "twilio", "custom"] as const;
+const PROVIDERS = ["signalwire", "telnyx", "twilio", "bitcall", "custom"] as const;
 
 const DEFAULT_STUN = ["stun:stun.l.google.com:19302"];
+
+/**
+ * A TURN URL, matching the pattern the browser enforces in `sip/config.ts`.
+ *
+ * Checked here too because a malformed relay address does not fail at save time: it
+ * fails during ICE gathering, in a browser, on a call, as silence. Rejecting it at
+ * the API is the last point where the person who typed it is still looking at it.
+ */
+const TURN_URL = /^(?:turns?):(?:\/\/)?[^\s/?:]+(?::\d{1,5})?(?:\?transport=(?:tcp|udp))?$/i;
+
+/**
+ * The message for a half-configured relay, shared by both write routes.
+ *
+ * The pairing itself is enforced by the `sip_accounts_turn_credential_pairs` check
+ * constraint rather than duplicated in a validator: an update can supply one of the
+ * two without the other and still be individually valid, so the rule is about the
+ * resulting row, and only the database sees that atomically.
+ */
+const TURN_PAIRING_ERROR =
+  "TURN servers need both a username and a credential. A relay refuses an unauthenticated allocation and the browser falls back to a direct connection, which looks configured and sounds like nothing.";
 
 const accountSchema = z.object({
   label: z.string().trim().max(120).nullish(),
@@ -32,6 +52,14 @@ const accountSchema = z.object({
     .regex(/^wss:\/\/[^\s]+$/i, "WebSocket URL must start with wss://"),
   caller_id: z.string().trim().max(40).nullish(),
   stun_urls: z.array(z.string().trim().min(1).max(200)).max(6).nullish(),
+  turn_urls: z
+    .array(z.string().trim().min(1).max(200).regex(TURN_URL, "TURN servers look like turn:host:3478"))
+    .max(6)
+    .nullish(),
+  turn_username: z.string().trim().max(200).nullish(),
+  // Plaintext for the same reason the SIP password is: the browser has to send it
+  // to the relay. Documented in SECURITY.md rather than hashed into uselessness.
+  turn_credential: z.string().trim().max(200).nullish(),
   register_expiry: z.number().int().min(60).max(3600).default(600),
   user_id: z.string().min(1).max(64).nullish(),
   enabled: z.boolean().default(true),
@@ -50,6 +78,9 @@ function mapAccount(row: any) {
     ws_url: row.ws_url,
     caller_id: row.caller_id,
     stun_urls: row.stun_urls ? JSON.parse(row.stun_urls) : DEFAULT_STUN,
+    turn_urls: row.turn_urls ? JSON.parse(row.turn_urls) : [],
+    turn_username: row.turn_username ?? null,
+    turn_credential: row.turn_credential ?? null,
     register_expiry: row.register_expiry,
     enabled: Boolean(row.enabled),
     created_at: row.created_at,
@@ -64,14 +95,14 @@ function mapAccount(row: any) {
  * a provider can block or bill individually. Mirrors the precedence the Supabase
  * client applies, so both deployment modes behave identically.
  */
-router.get("/effective", (req: AuthRequest, res) => {
+router.get("/effective", async (req: AuthRequest, res) => {
   const row =
-    db
+    await db
       .prepare(
         "SELECT * FROM sip_accounts WHERE enabled = 1 AND user_id = ? ORDER BY created_at LIMIT 1"
       )
       .get(req.userId) ??
-    db
+    await db
       .prepare(
         "SELECT * FROM sip_accounts WHERE enabled = 1 AND user_id IS NULL ORDER BY created_at LIMIT 1"
       )
@@ -80,12 +111,12 @@ router.get("/effective", (req: AuthRequest, res) => {
   res.json(row ? mapAccount(row) : null);
 });
 
-router.get("/", requireRole("admin"), (_req: AuthRequest, res) => {
-  const rows = db.prepare("SELECT * FROM sip_accounts ORDER BY created_at").all() as any[];
+router.get("/", requireRole("admin"), async (_req: AuthRequest, res) => {
+  const rows = await db.prepare("SELECT * FROM sip_accounts ORDER BY created_at").all() as any[];
   res.json(rows.map(mapAccount));
 });
 
-router.post("/", requireRole("admin"), (req: AuthRequest, res) => {
+router.post("/", requireRole("admin"), async (req: AuthRequest, res) => {
   const parsed = accountSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid SIP account" });
@@ -96,11 +127,12 @@ router.post("/", requireRole("admin"), (req: AuthRequest, res) => {
   const now = new Date().toISOString();
 
   try {
-    db.prepare(
+    await db.prepare(
       `INSERT INTO sip_accounts
         (id, user_id, label, provider, sip_uri, password, ws_url, caller_id,
-         stun_urls, register_expiry, enabled, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         stun_urls, turn_urls, turn_username, turn_credential,
+         register_expiry, enabled, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       id,
       account.user_id ?? null,
@@ -111,35 +143,48 @@ router.post("/", requireRole("admin"), (req: AuthRequest, res) => {
       account.ws_url,
       account.caller_id ?? null,
       JSON.stringify(account.stun_urls ?? DEFAULT_STUN),
+      JSON.stringify(account.turn_urls ?? []),
+      account.turn_username ?? null,
+      account.turn_credential ?? null,
       account.register_expiry,
       account.enabled ? 1 : 0,
       now,
       now
     );
   } catch (error) {
-    // The unique index on the owner column is what stops two trunk defaults, and
-    // SQLite reports that as a constraint error rather than something to retry.
-    res.status(409).json({
-      error:
-        String((error as Error).message).includes("UNIQUE")
-          ? "That user already has a SIP account, or a shared trunk default already exists."
-          : "Could not save the SIP account",
-    });
+    // The unique index on the owner column is what stops two trunk defaults. This
+    // matched "UNIQUE" while the database was SQLite; Postgres words it "duplicate
+    // key value violates unique constraint", so the readable message had quietly
+    // stopped being returned. Matched on the SQLSTATE, which does not depend on
+    // wording at all, with the text as a fallback.
+    const message = String((error as Error).message);
+    const code = (error as { code?: string }).code;
+    if (code === "23505" || /unique/i.test(message)) {
+      res.status(409).json({
+        error: "That user already has a SIP account, or a shared trunk default already exists.",
+      });
+      return;
+    }
+    if (code === "23514" && message.includes("sip_accounts_turn_credential_pairs")) {
+      res.status(400).json({ error: TURN_PAIRING_ERROR });
+      return;
+    }
+    res.status(409).json({ error: "Could not save the SIP account" });
     return;
   }
 
-  const row = db.prepare("SELECT * FROM sip_accounts WHERE id = ?").get(id) as any;
+  const row = await db.prepare("SELECT * FROM sip_accounts WHERE id = ?").get(id) as any;
   res.status(201).json(mapAccount(row));
 });
 
-router.patch("/:id", requireRole("admin"), (req: AuthRequest, res) => {
+router.patch("/:id", requireRole("admin"), async (req: AuthRequest, res) => {
   const parsed = accountUpdateSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid SIP account" });
     return;
   }
 
-  const existing = db.prepare("SELECT * FROM sip_accounts WHERE id = ?").get(req.params.id) as any;
+  const existing = await db.prepare("SELECT * FROM sip_accounts WHERE id = ?").get(req.params.id) as any;
   if (!existing) {
     res.status(404).json({ error: "SIP account not found" });
     return;
@@ -177,6 +222,18 @@ router.patch("/:id", requireRole("admin"), (req: AuthRequest, res) => {
     columns.push("stun_urls = ?");
     values.push(JSON.stringify(updates.stun_urls ?? DEFAULT_STUN));
   }
+  if (updates.turn_urls !== undefined) {
+    columns.push("turn_urls = ?");
+    values.push(JSON.stringify(updates.turn_urls ?? []));
+  }
+  if (updates.turn_username !== undefined) {
+    columns.push("turn_username = ?");
+    values.push(updates.turn_username ?? null);
+  }
+  if (updates.turn_credential !== undefined) {
+    columns.push("turn_credential = ?");
+    values.push(updates.turn_credential ?? null);
+  }
   if (updates.register_expiry !== undefined) {
     columns.push("register_expiry = ?");
     values.push(updates.register_expiry);
@@ -193,15 +250,29 @@ router.patch("/:id", requireRole("admin"), (req: AuthRequest, res) => {
   if (columns.length > 0) {
     columns.push("updated_at = ?");
     values.push(new Date().toISOString(), req.params.id);
-    db.prepare(`UPDATE sip_accounts SET ${columns.join(", ")} WHERE id = ?`).run(...values);
+    try {
+      await db.prepare(`UPDATE sip_accounts SET ${columns.join(", ")} WHERE id = ?`).run(...values);
+    } catch (error) {
+      // Clearing one of the TURN fields while leaving the other is the reachable
+      // case here: an operator removes the credential, the pairing constraint
+      // refuses the row, and without this the refusal arrived as a 500 from the
+      // global handler with a Postgres message in it.
+      const message = String((error as Error).message);
+      const code = (error as { code?: string }).code;
+      if (code === "23514" && message.includes("sip_accounts_turn_credential_pairs")) {
+        res.status(400).json({ error: TURN_PAIRING_ERROR });
+        return;
+      }
+      throw error;
+    }
   }
 
-  const row = db.prepare("SELECT * FROM sip_accounts WHERE id = ?").get(req.params.id) as any;
+  const row = await db.prepare("SELECT * FROM sip_accounts WHERE id = ?").get(req.params.id) as any;
   res.json(mapAccount(row));
 });
 
-router.delete("/:id", requireRole("admin"), (req: AuthRequest, res) => {
-  const result = db.prepare("DELETE FROM sip_accounts WHERE id = ?").run(req.params.id);
+router.delete("/:id", requireRole("admin"), async (req: AuthRequest, res) => {
+  const result = await db.prepare("DELETE FROM sip_accounts WHERE id = ?").run(req.params.id);
   if (result.changes === 0) {
     res.status(404).json({ error: "SIP account not found" });
     return;

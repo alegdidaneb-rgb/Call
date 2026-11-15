@@ -5,10 +5,14 @@ export {
   deriveWsUrl,
   domainFromSipUri,
   envSipAccount,
+  isTurnUrl,
   isUsableAccount,
   normaliseSipUri,
   parseSipUri,
+  resolveIceServers,
   resolveStunUrls,
+  splitUrlList,
+  turnProblem,
   usernameFromSipUri,
 } from "./config.js";
 export type { ParsedSipUri, SipAccount, SipPreset, SipProvider } from "./config.js";
@@ -16,7 +20,14 @@ export type { ParsedSipUri, SipAccount, SipPreset, SipProvider } from "./config.
 export { buildDialTarget, toDialDigits } from "./dialTarget.js";
 export type { DialTargetResult } from "./dialTarget.js";
 
-export { elapsedSeconds, sipEngine } from "./engine.js";
+export {
+  checkIceGathering,
+  checkMicrophone,
+  elapsedSeconds,
+  sipEngine,
+  testSipAccount,
+} from "./engine.js";
+export type { IceCandidateType, IceGatheringReport } from "./engine.js";
 export type {
   SipCallState,
   SipConnectionStatus,

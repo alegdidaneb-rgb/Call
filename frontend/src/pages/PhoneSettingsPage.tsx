@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Loader2,
+  Mic,
   Phone,
   Plus,
   RefreshCw,
@@ -23,11 +24,12 @@ import {
   isUsableAccount,
   normaliseSipUri,
   parseSipUri,
+  turnProblem,
   type SipAccount,
   type SipProvider,
 } from "@/sip/config";
-import { testSipAccount } from "@/sip/engine";
-import type { SipFailure } from "@/sip/engine";
+import { checkIceGathering, checkMicrophone, testSipAccount } from "@/sip/engine";
+import type { IceGatheringReport, SipFailure } from "@/sip/engine";
 import type { Database } from "@/types/database";
 
 type SipAccountRow = Database["public"]["Tables"]["sip_accounts"]["Row"];
@@ -41,6 +43,9 @@ const EMPTY_FORM: FormState = {
   wsUrl: "",
   callerId: "",
   stunUrls: "",
+  turnUrls: "",
+  turnUsername: "",
+  turnCredential: "",
   registerExpiry: 600,
   assignTo: "",
   enabled: true,
@@ -55,13 +60,18 @@ interface FormState {
   wsUrl: string;
   callerId: string;
   stunUrls: string;
+  /** One per line, like `stunUrls`. */
+  turnUrls: string;
+  turnUsername: string;
+  turnCredential: string;
   registerExpiry: number;
   /** Empty string means the shared trunk default. */
   assignTo: string;
   enabled: boolean;
 }
 
-function parseStunUrls(value: string): string[] {
+/** Both server lists are held in the form as one URL per line. */
+function parseUrlList(value: string): string[] {
   return value
     .split(/[\n,]+/)
     .map((entry) => entry.trim())
@@ -78,6 +88,9 @@ function rowToForm(row: SipAccountRow): FormState {
     wsUrl: row.ws_url,
     callerId: row.caller_id ?? "",
     stunUrls: (row.stun_urls ?? []).join("\n"),
+    turnUrls: (row.turn_urls ?? []).join("\n"),
+    turnUsername: row.turn_username ?? "",
+    turnCredential: row.turn_credential ?? "",
     registerExpiry: row.register_expiry ?? 600,
     assignTo: row.user_id ?? "",
     enabled: row.enabled,
@@ -94,7 +107,10 @@ function formToAccount(form: FormState): SipAccount {
     password: form.password,
     wsUrl: form.wsUrl.trim(),
     callerId: form.callerId.trim() || undefined,
-    stunUrls: parseStunUrls(form.stunUrls),
+    stunUrls: parseUrlList(form.stunUrls),
+    turnUrls: parseUrlList(form.turnUrls),
+    turnUsername: form.turnUsername.trim() || undefined,
+    turnCredential: form.turnCredential.trim() || undefined,
     registerExpiry: form.registerExpiry,
     isTrunkDefault: form.assignTo === "",
   };
@@ -120,6 +136,10 @@ function validate(form: FormState): string[] {
   if (form.registerExpiry < 60 || form.registerExpiry > 3600) {
     errors.push("Registration expiry must be between 60 and 3600 seconds.");
   }
+  // The database enforces the same pairing, but a constraint violation arrives as
+  // a query error long after the operator has stopped looking at this field.
+  const turn = turnProblem(formToAccount(form));
+  if (turn) errors.push(turn);
   return errors;
 }
 
@@ -128,6 +148,16 @@ export function PhoneSettingsPage() {
   const [errors, setErrors] = useState<string[]>([]);
   const [testResult, setTestResult] = useState<{ ok: boolean; failure: SipFailure | null } | null>(null);
   const [testing, setTesting] = useState(false);
+  /**
+   * The microphone and ICE result, kept apart from `testResult` because they answer
+   * different questions: registration says the credentials work, this says whether
+   * anybody would hear anything.
+   */
+  const [mediaCheck, setMediaCheck] = useState<{
+    mic: { ok: boolean; failure: SipFailure | null };
+    ice: IceGatheringReport;
+  } | null>(null);
+  const [checkingMedia, setCheckingMedia] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<SipAccountRow | null>(null);
 
   // One hook serves both deployment modes, so this page cannot drift between
@@ -156,7 +186,7 @@ export function PhoneSettingsPage() {
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((previous) => (previous ? { ...previous, [key]: value } : previous));
-    setTestResult(null);
+    clearDiagnostics();
   }
 
   // Choosing a provider fills in the WebSocket URL for the administrator, who is
@@ -180,7 +210,7 @@ export function PhoneSettingsPage() {
         SIP_PROVIDERS.some((candidate) => previous.wsUrl.trim() === deriveWsUrl(candidate, domain));
       return { ...previous, provider, wsUrl: derived ? auto : previous.wsUrl };
     });
-    setTestResult(null);
+    clearDiagnostics();
   }
 
   function changeSipUri(sipUri: string) {
@@ -194,7 +224,41 @@ export function PhoneSettingsPage() {
         wsUrl: stale && domain ? deriveWsUrl(previous.provider, domain) : previous.wsUrl,
       };
     });
+    clearDiagnostics();
+  }
+
+  /**
+   * Drops both diagnostic results together.
+   *
+   * One rule rather than two: anything that changes the account, or starts a new
+   * check, invalidates what the previous check concluded. Leaving either panel on
+   * screen next to settings that no longer match it is how a saved-but-broken
+   * configuration gets believed.
+   */
+  function clearDiagnostics() {
     setTestResult(null);
+    setMediaCheck(null);
+  }
+
+  /**
+   * Checks the microphone, then the network path audio would take.
+   *
+   * Deliberately usable on an unsaved, incomplete form: it needs no SIP
+   * credentials at all, only the STUN and TURN fields. Finding out that a relay
+   * does not answer, or that the headset is unplugged, is worth doing before an
+   * agent dials a real lead — after which the only symptom is a call in silence.
+   */
+  async function handleCheckMedia() {
+    if (!form) return;
+    setCheckingMedia(true);
+    setMediaCheck(null);
+    try {
+      const mic = await checkMicrophone();
+      const ice = await checkIceGathering(formToAccount(form));
+      setMediaCheck({ mic, ice });
+    } finally {
+      setCheckingMedia(false);
+    }
   }
 
   async function handleTest() {
@@ -203,7 +267,7 @@ export function PhoneSettingsPage() {
     setErrors(problems);
     if (problems.length > 0) return;
     setTesting(true);
-    setTestResult(null);
+    clearDiagnostics();
     try {
       setTestResult(await testSipAccount(formToAccount(form)));
     } finally {
@@ -224,7 +288,10 @@ export function PhoneSettingsPage() {
       password: form.password,
       ws_url: form.wsUrl.trim(),
       caller_id: form.callerId.trim() || null,
-      stun_urls: parseStunUrls(form.stunUrls),
+      stun_urls: parseUrlList(form.stunUrls),
+      turn_urls: parseUrlList(form.turnUrls),
+      turn_username: form.turnUsername.trim() || null,
+      turn_credential: form.turnCredential.trim() || null,
       register_expiry: form.registerExpiry,
       user_id: form.assignTo || null,
       enabled: form.enabled,
@@ -236,7 +303,7 @@ export function PhoneSettingsPage() {
         onSuccess: () => {
           setForm(null);
           setErrors([]);
-          setTestResult(null);
+          clearDiagnostics();
           toast.success("Phone settings saved");
         },
         onError: (error: Error) => toast.error(error.message),
@@ -295,7 +362,7 @@ export function PhoneSettingsPage() {
             onClick={() => {
               setForm({ ...EMPTY_FORM });
               setErrors([]);
-              setTestResult(null);
+              clearDiagnostics();
             }}
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-accent text-inverse text-sm font-medium hover:bg-accent-strong transition"
           >
@@ -343,7 +410,7 @@ export function PhoneSettingsPage() {
                     onClick={() => {
                       setForm(rowToForm(row));
                       setErrors([]);
-                      setTestResult(null);
+                      clearDiagnostics();
                     }}
                     className="p-2 rounded-lg text-faint hover:text-accent hover:bg-accent/12 transition"
                     title="Edit"
@@ -374,7 +441,7 @@ export function PhoneSettingsPage() {
               onClick={() => {
                 setForm(null);
                 setErrors([]);
-                setTestResult(null);
+                clearDiagnostics();
               }}
               className="p-1.5 rounded-lg text-faint hover:text-muted transition"
               title="Close"
@@ -517,6 +584,63 @@ export function PhoneSettingsPage() {
               />
             </Field>
 
+            <div className="rounded-lg border border-line bg-app p-4 space-y-3">
+              <div>
+                <h3 className="text-sm font-semibold text-ink">TURN relay</h3>
+                <p className="text-xs text-muted mt-1">
+                  STUN tells a browser its own public address, which is enough for most agents. It
+                  cannot help when both ends sit behind a symmetric NAT, or a firewall drops inbound
+                  UDP: the addresses they exchange are unreachable and the call connects in silence,
+                  in one or both directions. A TURN relay carries the media instead. Optional, and
+                  the only thing that fixes that case.
+                </p>
+                {SIP_PRESETS[form.provider].turnNote && (
+                  <p className="text-xs text-faint mt-1.5">
+                    {SIP_PRESETS[form.provider].turnNote}
+                  </p>
+                )}
+              </div>
+
+              <Field label="TURN servers (one per line)" hint="turn:turn.example.com:3478?transport=tcp">
+                <textarea
+                  value={form.turnUrls}
+                  onChange={(event) => set("turnUrls", event.target.value)}
+                  rows={2}
+                  placeholder={"turn:turn.example.com:3478"}
+                  className={`${inputClass} font-mono resize-none`}
+                />
+              </Field>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="TURN username">
+                  <input
+                    type="text"
+                    value={form.turnUsername}
+                    onChange={(event) => set("turnUsername", event.target.value)}
+                    className={inputClass}
+                    autoComplete="off"
+                  />
+                </Field>
+                <Field label="TURN credential">
+                  <input
+                    type="password"
+                    value={form.turnCredential}
+                    onChange={(event) => set("turnCredential", event.target.value)}
+                    className={inputClass}
+                    autoComplete="new-password"
+                  />
+                </Field>
+              </div>
+
+              <p className="text-2xs text-faint">
+                All three are required together. A relay refuses an unauthenticated allocation, and
+                the browser then falls back to a direct connection — which looks like a working
+                configuration and sounds like nothing. These are stored in plaintext, like the SIP
+                password, because the browser has to send them; use a credential that can only
+                allocate relays.
+              </p>
+            </div>
+
             <label className="flex items-center gap-2 text-sm text-ink">
               <input
                 type="checkbox"
@@ -563,7 +687,74 @@ export function PhoneSettingsPage() {
               </div>
             )}
 
+            {mediaCheck && (
+              <div className="rounded-lg border border-line divide-y divide-line">
+                <div
+                  className={`px-3 py-2 text-xs ${
+                    mediaCheck.mic.ok ? "text-success" : "text-danger"
+                  }`}
+                >
+                  {mediaCheck.mic.ok ? (
+                    <p className="flex items-center gap-1.5 font-medium">
+                      <CheckCircle2 className="w-4 h-4" />
+                      Microphone opened.
+                    </p>
+                  ) : (
+                    <div className="flex gap-1.5">
+                      <XCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-medium">
+                          {mediaCheck.mic.failure?.message ?? "The microphone could not be opened."}
+                        </p>
+                        {mediaCheck.mic.failure?.hint && <p className="mt-0.5">{mediaCheck.mic.failure.hint}</p>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div
+                  className={`px-3 py-2 text-xs ${
+                    mediaCheck.ice.failure ? "text-danger" : "text-success"
+                  }`}
+                >
+                  {mediaCheck.ice.failure ? (
+                    <div className="flex gap-1.5">
+                      <XCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-medium">{mediaCheck.ice.failure.message}</p>
+                        <p className="mt-0.5">{mediaCheck.ice.failure.hint}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-medium">
+                          {mediaCheck.ice.relayFound
+                            ? "Audio path found, including a TURN relay."
+                            : "Audio path found."}
+                        </p>
+                        <p className="mt-0.5 text-muted">
+                          Gathered {mediaCheck.ice.candidateTypes.join(", ") || "no"} candidates.
+                          {!mediaCheck.ice.relayFound &&
+                            " No relay: this works on an open network, and calls will have no audio for an agent behind a symmetric NAT. Add a TURN server to cover them."}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-wrap items-center gap-2 pt-1">
+              <button
+                onClick={handleCheckMedia}
+                disabled={checkingMedia}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-line-strong text-sm font-medium text-ink hover:bg-app disabled:opacity-50 transition"
+              >
+                {checkingMedia ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />}
+                Check microphone and audio path
+              </button>
               <button
                 onClick={handleTest}
                 disabled={testing || !isUsableAccount(formToAccount(form))}
@@ -581,7 +772,8 @@ export function PhoneSettingsPage() {
                 Save
               </button>
               <span className="text-xs text-faint">
-                Testing registers and then unregisters; it places no call.
+                Neither check places a call. Testing registers and then unregisters; the audio check
+                asks the network for candidates and opens the microphone briefly.
               </span>
             </div>
           </div>

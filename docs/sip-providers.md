@@ -56,6 +56,10 @@ the provider, or whether a PBX or gateway has to sit in between.
 | Bitcall | **No** | use a gateway — see the Bitcall section |
 | Asterisk, FreeSWITCH, 3CX | Yes, once configured | your own `wss://` endpoint |
 
+**Bitcall** is a preset in the Phone page as of migration 006, so its trunk can be
+saved without filing it under "Other". The preset carries the gateway requirement
+and the coturn note with it.
+
 Exact endpoints change; treat the values below as a starting point and confirm
 them in your provider's console, then verify with **Test connection**. The Phone
 page deliberately does not guess a WebSocket URL for a provider that has no
@@ -239,6 +243,82 @@ needs its external addresses declared (`external_signaling_address` and
 address the browser cannot reach and the call will be silent in one or both
 directions. The app sends Google's public STUN servers by default, which covers
 the browser side.
+
+#### TURN: when STUN is not enough
+
+STUN only reports an address. It cannot make two unreachable addresses reach each
+other, so there are networks where it does not help at all:
+
+- both ends behind a **symmetric NAT**, which hands out a different mapping per
+  destination, so the address STUN reports is not the one the far side needs;
+- a firewall that **drops inbound UDP**, common on corporate and hotel networks;
+- a PBX and an agent both on private ranges with no route between them.
+
+In all three the call still connects — signalling travels over the WebSocket, which
+works — and there is no audio. The call log records it as answered, with a duration,
+because from the app's point of view it was. This is the hardest failure in the
+whole system to diagnose after the fact, which is why the Phone page can be asked
+about it before anybody dials.
+
+A **TURN relay** carries the media instead of the two endpoints reaching each other
+directly. Add one under **Phone → TURN relay**:
+
+| Field | Example | Notes |
+| --- | --- | --- |
+| TURN servers | `turn:turn.example.com:3478` | One per line. `turns:` is the TLS variant, on 5349 |
+| | `turn:turn.example.com:3478?transport=tcp` | Use this where UDP out is blocked |
+| TURN username | `cold-dialer` | A coturn static user, or a `lt-cred-mech` one |
+| TURN credential | — | Stored in plaintext, like the SIP password. See SECURITY.md |
+
+All three are required together, and the database refuses a row that has some of
+them: a relay given no credential refuses the allocation and the browser falls back
+to a direct path, which reproduces exactly the silence TURN was added to prevent —
+but now behind a configuration that looks complete.
+
+**Check whether it works, rather than assuming.** *Check microphone and audio path*
+on the Phone page gathers ICE candidates against the settings in the form and
+reports which kinds came back:
+
+- `host` only — no STUN server answered; the browser knows nothing about its public
+  address.
+- `srflx` — STUN worked. Enough for most agents.
+- `relay` — a TURN server accepted an allocation. The only candidate type that
+  survives a symmetric NAT.
+
+If TURN servers are configured and no `relay` candidate appears, the panel says so
+and names it as a failure: the address, username or credential is wrong, or the
+relay is unreachable from that network. The check needs no SIP credentials and
+places no call, so it can be run from the form before saving.
+
+**coturn** is the usual relay. A minimal static-user configuration:
+
+```ini
+# /etc/turnserver.conf
+listening-port=3478
+tls-listening-port=5349
+realm=turn.example.com
+# A public address the relay can be reached on, if it sits behind NAT itself.
+external-ip=203.0.113.10
+lt-cred-mech
+user=cold-dialer:a-long-random-credential
+# Restrict where allocations may relay to, so a stolen credential is not an open
+# proxy into the rest of the network.
+denied-peer-ip=10.0.0.0-10.255.255.255
+denied-peer-ip=192.168.0.0-192.168.255.255
+min-port=49160
+max-port=49200
+```
+
+Bitcall's gateway installer offers to configure coturn on the same host — take it,
+and enter those details here.
+
+Time-limited credentials (coturn's `use-auth-secret`, where a server mints
+`<expiry>:<user>` names signed with an HMAC) are the better production answer,
+because a leaked credential stops working on its own. They need somewhere server-side
+to hold the secret and sign with it; this app reads `sip_accounts` straight from the
+database in the browser, so it stores a static credential instead. The columns and
+the engine support either — a deployment that adds a minting endpoint only has to
+fill `turn_username` and `turn_credential` with what it produced.
 
 ## Bitcall (outbound-only wholesale trunk)
 

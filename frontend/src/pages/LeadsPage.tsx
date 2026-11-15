@@ -9,6 +9,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { PageHeader } from "@/components/common/PageHeader";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { LeadGrid } from "@/components/leads/LeadGrid";
@@ -16,12 +17,14 @@ import { CsvImport } from "@/components/leads/CsvImport";
 import { LeadForm } from "@/components/leads/LeadForm";
 import { useCampaigns } from "@/hooks/useCampaigns";
 import {
+  useAssignLeads,
   useCreateLead,
   useCreateLeads,
   useDeleteLead,
   useLeads,
   useUpdateLead,
 } from "@/hooks/useLeads";
+import { personLabel, useAssignablePeople } from "@/hooks/usePeople";
 import {
   downloadCsv,
   leadsToCsv,
@@ -72,6 +75,22 @@ export function LeadsPage() {
   const createLeads = useCreateLeads();
   const updateLead = useUpdateLead();
   const deleteLead = useDeleteLead();
+  const assignLeads = useAssignLeads();
+
+  /**
+   * Who may decide who owns a lead.
+   *
+   * Administrators and managers, matching `is_privileged()` in the row-level
+   * policies and `requireRole("admin", "manager")` on the API. An agent may still
+   * claim an unassigned lead by opening it; distributing work between people is
+   * the roster owner's job.
+   */
+  const { isAdmin, isManager } = useAuth();
+  const canAssign = isAdmin || isManager;
+  // Not fetched at all for anybody who cannot assign. Under row-level security an
+  // agent reading `profiles` gets exactly one row — their own — which is useless to
+  // a picker, so this saves a request rather than working around a refusal.
+  const { assignable, byId: peopleById } = useAssignablePeople(canAssign);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -88,6 +107,8 @@ export function LeadsPage() {
     if (campaignParam) setCampaignFilter(campaignParam);
   }, [campaignParam]);
   const [countryFilter, setCountryFilter] = useState("all");
+  /** `all`, `unassigned`, or a person's id. */
+  const [ownerFilter, setOwnerFilter] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("created");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
@@ -121,19 +142,29 @@ export function LeadsPage() {
       }
       if (campaignFilter !== "all" && lead.campaign_id !== campaignFilter) return false;
       if (countryFilter !== "all" && lead.country !== countryFilter) return false;
+      if (ownerFilter === "unassigned") {
+        if (lead.assigned_to) return false;
+      } else if (ownerFilter !== "all" && lead.assigned_to !== ownerFilter) {
+        return false;
+      }
       return true;
     });
     return sortLeads(rows, sortKey, sortDirection);
-  }, [leads, search, statusFilter, campaignFilter, countryFilter, sortKey, sortDirection]);
+  }, [leads, search, statusFilter, campaignFilter, countryFilter, ownerFilter, sortKey, sortDirection]);
 
   const hasFilters =
-    Boolean(search.trim()) || statusFilter !== "all" || campaignFilter !== "all" || countryFilter !== "all";
+    Boolean(search.trim()) ||
+    statusFilter !== "all" ||
+    campaignFilter !== "all" ||
+    countryFilter !== "all" ||
+    ownerFilter !== "all";
 
   const clearFilters = useCallback(() => {
     setSearch("");
     setStatusFilter("all");
     setCampaignFilter("all");
     setCountryFilter("all");
+    setOwnerFilter("all");
   }, []);
 
   const handleSortChange = useCallback(
@@ -218,6 +249,61 @@ export function LeadsPage() {
       clearSelection();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not update every selected lead");
+    }
+  }
+
+  /**
+   * Moves one lead, and puts the control back if the write was refused.
+   *
+   * Reverting matters more here than for a status change: a select left showing an
+   * owner that was never written says the lead is somebody's, and the next person
+   * to look at the list believes it.
+   */
+  async function handleAssign(lead: Lead, personId: string | null) {
+    if ((lead.assigned_to ?? null) === personId) return;
+    const previous = lead.assigned_to ?? null;
+    try {
+      await assignLeads.mutateAsync({ leadIds: [lead.id], assignedTo: personId });
+      const person = personId ? peopleById.get(personId) : null;
+      // Three cases, not two: the id can name somebody who left the roster between
+      // the grid rendering and the click, and reporting that as "returned to the
+      // pool" would be the opposite of what happened.
+      toast.success(
+        !personId
+          ? "Returned to the unassigned pool"
+          : person
+            ? `Assigned to ${personLabel(person)}`
+            : "Lead assigned",
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not assign that lead");
+      void assignLeads
+        .mutateAsync({ leadIds: [lead.id], assignedTo: previous })
+        .catch(() => undefined);
+    }
+  }
+
+  async function handleBulkAssign(personId: string | null) {
+    const targets = selectedLeads;
+    if (targets.length === 0) return;
+    const person = personId ? peopleById.get(personId) : null;
+    if (personId && !person) {
+      toast.error("That person is no longer on the roster");
+      return;
+    }
+    try {
+      const { changed, requested } = await assignLeads.mutateAsync({
+        leadIds: targets.map((lead) => lead.id),
+        assignedTo: personId,
+      });
+      const noun = `${changed} lead${changed === 1 ? "" : "s"}`;
+      const message = person ? `Assigned ${noun} to ${personLabel(person)}` : `Returned ${noun} to the unassigned pool`;
+      // Saying "assigned 500" when 497 moved would send somebody looking for three
+      // leads that are not where they were told.
+      toast.success(changed === requested ? message : `${message} — ${requested - changed} no longer exist`);
+      clearSelection();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not assign every selected lead");
     }
   }
 
@@ -350,6 +436,23 @@ export function LeadsPage() {
           ))}
         </select>
 
+        {canAssign ? (
+          <select
+            value={ownerFilter}
+            onChange={(event) => setOwnerFilter(event.target.value)}
+            aria-label="Filter by who owns the lead"
+            className="input !w-auto"
+          >
+            <option value="all">Every owner</option>
+            <option value="unassigned">Unassigned</option>
+            {assignable.map((person) => (
+              <option key={person.id} value={person.id}>
+                {personLabel(person)}
+              </option>
+            ))}
+          </select>
+        ) : null}
+
         {countries.length > 1 ? (
           <select
             value={countryFilter}
@@ -405,6 +508,30 @@ export function LeadsPage() {
             )}
           </select>
 
+          {canAssign ? (
+            <select
+              value=""
+              onChange={(event) => {
+                // "" is the placeholder, so it never fires; "unassigned" is a real
+                // choice and has to be distinguishable from it.
+                if (event.target.value) void handleBulkAssign(
+                  event.target.value === "unassigned" ? null : event.target.value,
+                );
+              }}
+              aria-label="Assign the selection to somebody"
+              className="input !w-auto !py-1 !text-xs"
+            >
+              <option value="">Assign to…</option>
+              {assignable.map((person) => (
+                <option key={person.id} value={person.id}>
+                  {personLabel(person)}
+                  {person.provisioned ? "" : " — not onboarded"}
+                </option>
+              ))}
+              <option value="unassigned">Nobody (unassigned pool)</option>
+            </select>
+          ) : null}
+
           <button type="button" onClick={() => void handleBulkDnc()} className="btn btn-secondary btn-sm">
             Do not contact
           </button>
@@ -432,6 +559,10 @@ export function LeadsPage() {
         onToggleSelect={handleToggleSelect}
         onSelectAll={handleSelectAll}
         onStatusChange={(lead, status) => void handleStatusChange(lead, status)}
+        assignable={canAssign ? assignable : []}
+        peopleById={peopleById}
+        canAssign={canAssign}
+        onAssign={(lead, personId) => void handleAssign(lead, personId)}
         onOpen={(lead) => navigate(`/leads/${lead.id}`)}
         onDelete={(lead) =>
           setDeleteTarget({

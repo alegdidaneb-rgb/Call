@@ -36,13 +36,30 @@ is public by design, so **Row Level Security is the only access control**:
 - Triggers normalise `created_by` / `user_id` to `auth.uid()` so a client cannot
   attribute rows to another user.
 - A trigger prevents non-admins from changing their own `role`.
+- A second trigger, `protect_lead_assignment()` (migration 007), restricts
+  `leads.assigned_to`. RLS alone was not enough: an agent may update a lead they
+  created, and `WITH CHECK` passes for such a row on `created_by = auth.uid()`
+  whatever `assigned_to` is set to, so an agent could hand their own lead to
+  somebody else or take one back from a colleague. The trigger leaves agents two
+  acts — claiming an unassigned lead, and releasing one of their own — and refuses
+  everything else with `Only an admin or manager can assign a lead to somebody
+  else`. It applies to `anon`/`authenticated` only; see the note below on why
+  `is_service_role()` is the wrong gate for a server-side connection.
 - The `anon` role has no table grants at all.
 
 Never ship the `service_role` or `sb_secret_*` key to the browser. Only
 `VITE_SUPABASE_URL` and the publishable/anon key belong in a `VITE_` variable.
 
-### Self-hosted API mode (Express + SQLite)
+### Self-hosted API mode (Express + Postgres)
 
+- `DATABASE_URL` is **required**, in every environment including development, and
+  there is no fallback. The server exits at startup if it is missing or is not a
+  `postgres://` URL. This is deliberate: the SQLite store this replaced created a
+  file wherever it was pointed, so a typo in the environment produced a *working*
+  server full of empty tables rather than an error. Failing loudly is the safer
+  default, and on a serverless platform there is no local file to fall back to.
+  Use a role scoped to this application's tables rather than the database
+  superuser, and keep the host off the public internet.
 - `JWT_SECRET` is **required** in production. The server exits at startup if it
   is missing, shorter than 32 characters, or set to a value published in this
   repository's history. See `backend/src/config/env.ts`.
@@ -50,6 +67,15 @@ Never ship the `service_role` or `sb_secret_*` key to the browser. Only
   `profiles.password_hash`. The hash is never returned by any endpoint.
 - Login is rate limited (20 requests / 15 min per IP), and failed logins return
   a generic message with uniform timing. There is no public signup endpoint.
+  **Caveat when deployed as a serverless function:** `express-rate-limit` counts
+  in process memory, so each lambda instance keeps its own counter and an attacker
+  who spreads requests across instances gets a multiple of the stated budget. It
+  still throttles a single instance, and the platform reuses warm ones, but it is
+  not the guarantee it was as one long-lived process. Closing the gap needs a
+  shared store (`rate-limit-redis`, `@upstash/ratelimit`) and therefore
+  infrastructure this deployment does not have. Recorded rather than papered over;
+  Supabase mode is unaffected, as it enforces auth limits at the platform.
+  The same applies to the 300/min global limiter.
 - Data routes additionally require `requireProvisioned`, so an account that
   authenticated but was never created by an administrator gets `403` rather than
   an empty result set that looks like a successful load.
@@ -57,6 +83,13 @@ Never ship the `service_role` or `sb_secret_*` key to the browser. Only
 - Every route is scoped to the authenticated user, and destructive operations
   (`DELETE /leads/:id`, `DELETE /campaigns/:id`, `DELETE /scripts/:id`) require
   the `admin` role.
+- Reassignment is privileged: `POST /leads/assign` requires `admin` or `manager`,
+  and `PATCH /leads/:id` refuses an `assigned_to` naming anybody but the caller
+  unless they hold one of those roles. This is the application-layer twin of the
+  migration 007 trigger, and the reason that trigger must not be gated on
+  `is_service_role()` — that helper reads the JWT claims GUC, and a direct
+  `DATABASE_URL` connection has none, so gating on it would refuse every
+  assignment an administrator made through this API.
 - CSV import is capped at `MAX_IMPORT_ROWS` (default 1000) and reports per-row
   failures instead of silently dropping them.
 
@@ -74,6 +107,17 @@ server they control. Unprovisioned accounts can read nothing, including the
 shared trunk default. `anon` has no grants at all. A partial unique index allows
 at most one trunk default, so the "which extension am I dialling from?" lookup
 cannot become ambiguous.
+
+A TURN relay credential is stored the same way, in `sip_accounts.turn_username` and
+`turn_credential`, for the same reason: the browser presents it to the relay to
+allocate a port, so a hashed one is a relay that refuses the allocation. It is
+plaintext at rest and readable by the browser, exactly like the SIP password. The
+mitigation is the shape of the credential rather than its storage — a coturn user
+that can allocate relays and nothing else, with `denied-peer-ip` ranges so a leaked
+one is not an open proxy into the rest of the network, and a short `min-port` /
+`max-port` window. Time-limited HMAC credentials (coturn `use-auth-secret`) expire
+on their own and are the better answer; they need a server-side secret to sign with,
+which a browser-only deployment does not have. See `docs/sip-providers.md`.
 
 In self-hosted API mode the same rules are enforced by `requireRole("admin")` on
 every write and by `requireProvisioned` on every read.
@@ -234,7 +278,7 @@ Unused dependencies are removed rather than patched: `multer`, `papaparse` and
 the whole Drizzle layer (`drizzle-orm`, `drizzle-kit`, `src/db/schema.ts`) were
 declared but never imported by runtime code. Dropping Drizzle also removes a
 second, competing definition of the schema — the DDL in `src/db/database.ts` is
-now the single source of truth for SQLite.
+now the single source of truth for the self-hosted Postgres schema.
 
 ## Hardening Checklist for Production
 
@@ -244,5 +288,6 @@ now the single source of truth for SQLite.
 - [ ] Supabase migrations applied and RLS verified with
       `select relname, relrowsecurity from pg_class where relnamespace = 'public'::regnamespace;`
 - [ ] HTTPS enforced; SIP over `wss://` only
-- [ ] Filesystem permissions restrict access to the SQLite database file
+- [ ] `DATABASE_URL` credentials are not the database superuser, and the host is
+      not reachable from the public internet (API mode)
 - [ ] Dependencies audited (`npm audit`) and CodeQL enabled

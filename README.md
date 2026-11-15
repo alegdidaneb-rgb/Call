@@ -90,7 +90,8 @@ A free, open-source browser-based cold calling dialer with SIP support. No insta
 
 ### Deployment
 
-- **Self-hosted backend** — SQLite, no cloud dependencies required
+- **Self-hosted backend** — Postgres, deployable as a container or as a
+  serverless function
 - **Supabase support** — optional cloud database with row-level security
 - **Docker ready** — one-command deployment
 - **REST API** — full API for integrations
@@ -223,7 +224,7 @@ gateway runbook.
 | Layer | Technology |
 |-------|-----------|
 | Frontend | React 18 + Vite + TypeScript + Tailwind CSS |
-| Backend | Express.js + SQLite (better-sqlite3) |
+| Backend | Express.js + Postgres (`pg`) |
 | Auth | JWT (bcryptjs) |
 | SIP/Telephony | SIP.js (WebRTC) |
 | Data Fetching | TanStack React Query |
@@ -246,7 +247,7 @@ Open-Cold-Dialer/
 │       └── types/           # TypeScript types
 ├── backend/                 # Express API server
 │   └── src/
-│       ├── db/              # SQLite schema + seed
+│       ├── db/              # Postgres schema, pool, seed
 │       ├── middleware/      # Auth middleware
 │       └── routes/          # API routes
 ├── docs/                    # Documentation
@@ -350,8 +351,9 @@ from Supabase, and **Row Level Security is the access control layer** — see
    `VITE_SIP_CALLER_ID` to place real calls. These are compiled into the browser
    bundle, so issue one low-privilege extension per agent and rotate on suspicion.
 
-> The Express + SQLite backend is for self-hosting (Docker or a VPS). It requires
-> `JWT_SECRET` and refuses to start in production without it.
+> The Express + Postgres backend is for self-hosting (Docker, a VPS, or Vercel's
+> serverless runtime via `backend/api/index.ts`). It requires `DATABASE_URL` and
+> `JWT_SECRET`, and refuses to start without either.
 
 ---
 

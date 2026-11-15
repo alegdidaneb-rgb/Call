@@ -54,17 +54,17 @@ function scope(req: AuthRequest): { sql: string; params: unknown[] } {
   return { sql: "user_id = ?", params: [req.userId] };
 }
 
-router.get("/", (req: AuthRequest, res) => {
+router.get("/", async (req: AuthRequest, res) => {
   const { sql, params } = scope(req);
-  const rows = db
+  const rows = await db
     .prepare(`SELECT * FROM call_logs WHERE ${sql} ORDER BY created_at DESC LIMIT 1000`)
     .all(...params) as any[];
   res.json(rows.map(mapCallLog));
 });
 
-router.get("/lead/:leadId", (req: AuthRequest, res) => {
+router.get("/lead/:leadId", async (req: AuthRequest, res) => {
   const { sql, params } = scope(req);
-  const rows = db
+  const rows = await db
     .prepare(
       `SELECT * FROM call_logs WHERE lead_id = ? AND ${sql} ORDER BY created_at DESC LIMIT 500`
     )
@@ -72,9 +72,9 @@ router.get("/lead/:leadId", (req: AuthRequest, res) => {
   res.json(rows.map(mapCallLog));
 });
 
-router.get("/:id", (req: AuthRequest, res) => {
+router.get("/:id", async (req: AuthRequest, res) => {
   const { sql, params } = scope(req);
-  const row = db
+  const row = await db
     .prepare(`SELECT * FROM call_logs WHERE id = ? AND ${sql}`)
     .get(req.params.id, ...params) as any;
   if (!row) {
@@ -84,7 +84,7 @@ router.get("/:id", (req: AuthRequest, res) => {
   res.json(mapCallLog(row));
 });
 
-router.post("/", (req: AuthRequest, res) => {
+router.post("/", async (req: AuthRequest, res) => {
   const parsed = callLogSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid call log payload" });
@@ -96,7 +96,7 @@ router.post("/", (req: AuthRequest, res) => {
 
   // `user_id` is always taken from the authenticated session. Accepting it from
   // the request body let a caller attribute logs to any other user.
-  db.prepare(
+  await db.prepare(
     `INSERT INTO call_logs (id, lead_id, user_id, campaign_id, direction, outcome, duration_seconds, recording_url, notes, transcript, sip_call_id, started_at, ended_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
@@ -116,17 +116,17 @@ router.post("/", (req: AuthRequest, res) => {
   );
 
   if (log.lead_id) {
-    db.prepare(
-      "UPDATE leads SET last_called_at = datetime('now'), call_count = call_count + 1, updated_at = datetime('now') WHERE id = ?"
+    await db.prepare(
+      "UPDATE leads SET last_called_at = now(), call_count = call_count + 1, updated_at = now() WHERE id = ?"
     ).run(log.lead_id);
   }
 
-  const row = db.prepare("SELECT * FROM call_logs WHERE id = ?").get(id) as any;
+  const row = await db.prepare("SELECT * FROM call_logs WHERE id = ?").get(id) as any;
   res.status(201).json(mapCallLog(row));
 });
 
-router.delete("/:id", (req: AuthRequest, res) => {
-  const existing = db.prepare("SELECT * FROM call_logs WHERE id = ?").get(req.params.id) as any;
+router.delete("/:id", async (req: AuthRequest, res) => {
+  const existing = await db.prepare("SELECT * FROM call_logs WHERE id = ?").get(req.params.id) as any;
   if (!existing) {
     res.status(404).json({ error: "Call log not found" });
     return;
@@ -135,7 +135,7 @@ router.delete("/:id", (req: AuthRequest, res) => {
     res.status(403).json({ error: "You can only delete your own call logs" });
     return;
   }
-  db.prepare("DELETE FROM call_logs WHERE id = ?").run(req.params.id);
+  await db.prepare("DELETE FROM call_logs WHERE id = ?").run(req.params.id);
   res.status(204).end();
 });
 

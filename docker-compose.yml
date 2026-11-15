@@ -1,0 +1,63 @@
+services:
+  # The database is a service now, not a file on a volume. Under SQLite the API
+  # owned its storage; that is impossible on a platform whose filesystem is
+  # read-only outside /tmp, and it also meant the data lived wherever the container
+  # happened to be.
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=coldialer
+      - POSTGRES_DB=coldialer
+      # `${VAR:?message}` makes compose fail fast rather than boot a database with
+      # a published default password that anyone could guess.
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    # Not published to the host: nothing outside this compose network should reach
+    # the database. Expose a port here only for deliberate local debugging.
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U coldialer -d coldialer"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    ports:
+      - "4000:4000"
+    depends_on:
+      # Wait for Postgres to accept connections, not merely for the container to
+      # start. Without the health condition the API's first cold-start migration
+      # races the database and the backend exits on a connection refused.
+      db:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      # `${VAR:?message}` makes compose fail fast instead of booting the API with
+      # a published placeholder secret that anyone could use to forge tokens.
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set, e.g. `openssl rand -hex 32`}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
+      # Same-network host name, so the credentials never leave the compose network.
+      - DATABASE_URL=postgres://coldialer:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/coldialer
+      # Plain TCP inside an isolated bridge network. Set PGSSLMODE=require if the
+      # database is ever moved off it.
+      - PGSSLMODE=disable
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  db-data:

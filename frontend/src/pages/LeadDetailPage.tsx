@@ -1,9 +1,11 @@
 import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { useLead } from "@/hooks/useLeads";
 import { useCallLog } from "@/hooks/useCallLogs";
 import { useCreateCallLog } from "@/hooks/useCallLogs";
-import { useUpdateLead, useDeleteLead } from "@/hooks/useLeads";
+import { useUpdateLead, useDeleteLead, useAssignLeads } from "@/hooks/useLeads";
+import { ownerLabel, personLabel, useAssignablePeople } from "@/hooks/usePeople";
 import toast from "react-hot-toast";
 import { Softphone } from "@/components/softphone/Softphone";
 import type { CallEndData } from "@/components/softphone/types";
@@ -15,7 +17,7 @@ import { LeadForm } from "@/components/leads/LeadForm";
 import { CallScriptViewer } from "@/components/scripts/CallScriptViewer";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
-import { ArrowLeft, Edit3, Trash2, Phone, Mail, Globe, MapPin, FileText } from "lucide-react";
+import { ArrowLeft, Edit3, Trash2, Phone, Mail, Globe, MapPin, FileText, Users } from "lucide-react";
 import { countryName, flagEmoji } from "@/data/countries";
 
 export function LeadDetailPage() {
@@ -28,6 +30,41 @@ export function LeadDetailPage() {
   const deleteLeadMutation = useDeleteLead();
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  /**
+   * Who owns this lead, and who may change that.
+   *
+   * The same rule as the lead list: administrators and managers distribute work,
+   * matching `is_privileged()` in the row-level policies. Everybody else is shown
+   * the owner rather than a control the server would refuse.
+   */
+  const { isAdmin, isManager, user } = useAuth();
+  const canAssign = isAdmin || isManager;
+  const { assignable, byId: peopleById } = useAssignablePeople(canAssign);
+  const assignLeads = useAssignLeads();
+
+  async function handleAssign(personId: string | null) {
+    if (!lead || (lead.assigned_to ?? null) === personId) return;
+    const previous = lead.assigned_to ?? null;
+    try {
+      await assignLeads.mutateAsync({ leadIds: [lead.id], assignedTo: personId });
+      const person = personId ? peopleById.get(personId) : null;
+      toast.success(
+        !personId
+          ? "Returned to the unassigned pool"
+          : person
+            ? `Assigned to ${personLabel(person)}`
+            : "Lead assigned",
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not assign this lead");
+      // Put the control back rather than leaving it showing an owner that was
+      // never written.
+      void assignLeads
+        .mutateAsync({ leadIds: [lead.id], assignedTo: previous })
+        .catch(() => undefined);
+    }
+  }
   const [showEdit, setShowEdit] = useState(false);
   const [showScript, setShowScript] = useState(false);
 
@@ -161,11 +198,50 @@ export function LeadDetailPage() {
         </div>
 
         <div className="space-y-6">
+          {canAssign ? (
+            <div className="bg-panel rounded-xl border border-line p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Users className="w-4 h-4 text-accent" />
+                <h2 className="text-lg font-semibold text-ink">Assignment</h2>
+              </div>
+              <p className="text-xs text-muted mb-3">
+                An unassigned lead sits in the pool everybody can see and claim.
+                Assigning it makes it one person's work, and it stays visible to
+                administrators.
+              </p>
+              <select
+                value={lead.assigned_to ?? ""}
+                onChange={(event) => void handleAssign(event.target.value || null)}
+                disabled={assignLeads.isPending}
+                aria-label="Who owns this lead"
+                className="w-full cursor-pointer rounded-lg border border-line-strong bg-panel px-3 py-2 text-sm text-ink outline-none transition-colors hover:border-accent focus:ring-2 focus:ring-accent disabled:opacity-50"
+              >
+                <option value="">Unassigned</option>
+                {assignable.map((person) => (
+                  <option key={person.id} value={person.id}>
+                    {personLabel(person)}
+                    {person.provisioned ? "" : " — not onboarded"}
+                  </option>
+                ))}
+              </select>
+              {lead.assigned_to && !peopleById.has(lead.assigned_to) ? (
+                <p className="text-2xs text-faint mt-2">
+                  The current owner is not on the roster any more. Choosing anybody
+                  else, or "Unassigned", replaces them.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="bg-panel rounded-xl border border-line p-5">
             <h2 className="text-lg font-semibold text-ink mb-4">Lead details</h2>
             <dl className="space-y-3">
               {[
                 ["Status", lead.status],
+                [
+                  "Assigned to",
+                  ownerLabel(lead.assigned_to, peopleById, user?.id ?? null, canAssign),
+                ],
                 ["Source", lead.source ?? "—"],
                 ["Company", lead.company ?? "—"],
                 ["Phone", lead.phone ?? "—"],

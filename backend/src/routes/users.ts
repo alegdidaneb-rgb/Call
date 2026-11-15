@@ -86,9 +86,9 @@ function publicUser(row: ProfileRow) {
   };
 }
 
-router.get("/", (_req: AuthRequest, res) => {
+router.get("/", async (_req: AuthRequest, res) => {
   try {
-    const rows = db
+    const rows = await db
       .prepare(
         "SELECT id, username, email, full_name, role, invited_by, created_at " +
           "FROM profiles ORDER BY created_at ASC"
@@ -110,7 +110,7 @@ router.post("/", async (req: AuthRequest, res) => {
   const { username, password, fullName, role } = parsed.data;
 
   try {
-    const existing = db
+    const existing = await db
       .prepare("SELECT id FROM profiles WHERE lower(username) = lower(?)")
       .get(username);
     if (existing) {
@@ -127,7 +127,7 @@ router.post("/", async (req: AuthRequest, res) => {
     // `invited_by` is the acting administrator, so the new account is
     // provisioned from the moment it exists. The email column is NOT NULL and
     // predates usernames, so it holds a derived address that is never mailed.
-    db.prepare(
+    await db.prepare(
       "INSERT INTO profiles (id, username, email, full_name, password_hash, role, invited_by) " +
         "VALUES (?, ?, ?, ?, ?, ?, ?)"
     ).run(
@@ -140,7 +140,7 @@ router.post("/", async (req: AuthRequest, res) => {
       req.userId!
     );
 
-    const row = db
+    const row = await db
       .prepare(
         "SELECT id, username, email, full_name, role, invited_by, created_at " +
           "FROM profiles WHERE id = ?"
@@ -179,7 +179,7 @@ router.post("/:id/password", async (req: AuthRequest, res) => {
   }
 
   try {
-    const target = db
+    const target = await db
       .prepare("SELECT id, username FROM profiles WHERE id = ?")
       .get(req.params.id) as { id: string; username: string | null } | undefined;
     if (!target) {
@@ -188,7 +188,7 @@ router.post("/:id/password", async (req: AuthRequest, res) => {
     }
 
     const passwordHash = await bcrypt.hash(parsed.data.password, BCRYPT_ROUNDS);
-    db.prepare("UPDATE profiles SET password_hash = ?, updated_at = datetime('now') WHERE id = ?").run(
+    await db.prepare("UPDATE profiles SET password_hash = ?, updated_at = now() WHERE id = ?").run(
       passwordHash,
       target.id
     );

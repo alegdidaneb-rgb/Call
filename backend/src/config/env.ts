@@ -13,6 +13,40 @@ export const isProduction = NODE_ENV === "production";
 
 export const PORT = Number.parseInt(process.env.PORT || "4000", 10);
 
+/**
+ * Postgres connection string, read here but validated on first connection.
+ *
+ * Validation is deferred to `requireDatabaseUrl()`, which the pool calls when it
+ * first opens. Throwing at module load instead picks the wrong moment to fail on a
+ * serverless platform: the runtime imports this module during instance
+ * initialisation, so a throw surfaces as an opaque `INITIALIZATION_ERROR` 500 that
+ * never says what is missing. Deferred, the same misconfiguration travels through
+ * `schemaReady`, which `api/index.ts` already converts into a `503` naming the
+ * cause. The long-lived server is unaffected — it awaits the schema before it
+ * listens, so this still stops the process at boot.
+ *
+ * There is deliberately no default value. The SQLite store this replaced created a
+ * file wherever it was pointed, so a typo in the environment produced a *working*
+ * server full of empty tables rather than an error anyone would notice.
+ */
+export const DATABASE_URL = process.env.DATABASE_URL?.trim() ?? "";
+
+/** Returns the connection string, or throws with an actionable message. */
+export function requireDatabaseUrl(): string {
+  if (!DATABASE_URL) {
+    throw new Error(
+      "DATABASE_URL is not set. Point it at a Postgres database, e.g. " +
+        "postgres://user:password@host:5432/dbname. There is no local-file fallback: " +
+        "the previous SQLite store could not survive a serverless filesystem, and a " +
+        "silent default produced an empty database instead of an error."
+    );
+  }
+  if (!/^(postgres|postgresql):\/\//i.test(DATABASE_URL)) {
+    throw new Error("DATABASE_URL must be a postgres:// or postgresql:// connection string");
+  }
+  return DATABASE_URL;
+}
+
 /** Secrets that appear in this project's history, docs or compose files. */
 const KNOWN_WEAK_SECRETS = new Set([
   "cold-dialer-dev-secret-change-in-production",

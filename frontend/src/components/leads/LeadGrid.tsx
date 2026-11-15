@@ -11,6 +11,8 @@ import {
 import { EmptyState } from "@/components/common/EmptyState";
 import { SkeletonRows } from "@/components/common/Skeleton";
 import { leadInitials, leadName } from "@/lib/leads";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { ownerLabel, personLabel, type AssignablePerson } from "@/hooks/usePeople";
 import { chipClass, dotClass, statusTone } from "@/lib/outcomes";
 import { flagEmoji } from "@/data/countries";
 import type { SortDirection, SortKey } from "@/lib/leads";
@@ -42,6 +44,10 @@ const COLUMNS: Array<{ key: SortKey | null; label: string; className: string }> 
   { key: "company", label: "Company", className: "hidden w-40 shrink-0 md:block" },
   { key: "phone", label: "Phone", className: "hidden w-40 shrink-0 lg:block" },
   { key: "country", label: "", className: "hidden w-12 shrink-0 xl:block" },
+  // Not sortable: the owner lives in another table, so ordering by it would mean
+  // resolving every row's name before comparing two of them. The owner filter on
+  // the page does the useful half of that job.
+  { key: null, label: "Owner", className: "hidden w-28 shrink-0 xl:block" },
   { key: "status", label: "Status", className: "w-36 shrink-0" },
   { key: "calls", label: "Calls", className: "hidden w-16 shrink-0 text-right sm:block" },
   { key: "lastCalled", label: "Last called", className: "hidden w-28 shrink-0 text-right lg:block" },
@@ -78,6 +84,19 @@ interface LeadGridProps {
   onToggleSelect: (id: string, range: boolean) => void;
   onSelectAll: () => void;
   onStatusChange: (lead: Lead, status: LeadStatus) => void;
+  /** Who can be given a lead, in picker order. Empty for anybody who cannot assign. */
+  assignable: AssignablePerson[];
+  peopleById: Map<string, AssignablePerson>;
+  /**
+   * Whether this reader may change who owns a lead.
+   *
+   * Decides between a control and a label. An agent is shown the owner rather than
+   * a dropdown they are not permitted to use: a disabled select reads as a bug, and
+   * a working one would be refused by the server, which is a worse way to learn the
+   * rule.
+   */
+  canAssign: boolean;
+  onAssign: (lead: Lead, personId: string | null) => void;
   onOpen: (lead: Lead) => void;
   onDelete: (lead: Lead) => void;
   isLoading: boolean;
@@ -94,12 +113,17 @@ export function LeadGrid({
   onToggleSelect,
   onSelectAll,
   onStatusChange,
+  assignable,
+  peopleById,
+  canAssign,
+  onAssign,
   onOpen,
   onDelete,
   isLoading,
   hasFilters,
   onClearFilters,
 }: LeadGridProps) {
+  const { user } = useAuth();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewport, setViewport] = useState(520);
@@ -141,6 +165,22 @@ export function LeadGrid({
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     if (leads.length === 0) return;
+    /**
+     * Leave the keys alone when the target is a control of its own.
+     *
+     * Every branch below calls `preventDefault()`, and these handlers sit on the
+     * scroll container, so a keydown inside a row's `<select>` bubbles up here and
+     * is cancelled: the arrow keys would move the active row instead of moving
+     * through the options, Space would toggle the checkbox instead of opening the
+     * list, and — the expensive one — Enter would navigate to the lead detail page
+     * instead of confirming the owner just chosen. The status picker had this
+     * problem before assignment existed; the owner picker would have made it
+     * something an administrator hits every time they use the keyboard.
+     */
+    const target = event.target as HTMLElement | null;
+    if (target && (target.closest("select, input, textarea, button") || target.isContentEditable)) {
+      return;
+    }
     if (event.key === "ArrowDown" || (event.key === "j" && !event.metaKey && !event.ctrlKey)) {
       event.preventDefault();
       setActiveIndex((index) => Math.min(index + 1, leads.length - 1));
@@ -337,6 +377,40 @@ export function LeadGrid({
                       aria-hidden="true"
                     >
                       {lead.country ? flagEmoji(lead.country) : ""}
+                    </span>
+
+                    <span className="hidden w-28 shrink-0 xl:block">
+                      {canAssign ? (
+                        <select
+                          value={lead.assigned_to ?? ""}
+                          onClick={(event) => event.stopPropagation()}
+                          onChange={(event) => onAssign(lead, event.target.value || null)}
+                          aria-label={`Who owns ${leadName(lead)}`}
+                          title={
+                            lead.assigned_to
+                              ? `Assigned to ${ownerLabel(lead.assigned_to, peopleById, user?.id ?? null, canAssign)}`
+                              : "In the unassigned pool"
+                          }
+                          className="w-full cursor-pointer appearance-none rounded border border-line-strong bg-panel !px-1.5 !py-0.5 text-2xs text-muted outline-none transition-colors hover:border-accent focus:ring-2 focus:ring-accent"
+                        >
+                          <option value="" className="bg-panel text-ink">
+                            Unassigned
+                          </option>
+                          {assignable.map((person) => (
+                            <option key={person.id} value={person.id} className="bg-panel text-ink">
+                              {personLabel(person)}
+                              {person.provisioned ? "" : " — not onboarded"}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span
+                          className={`block truncate text-2xs ${lead.assigned_to ? "text-muted" : "text-faint"}`}
+                          title={lead.assigned_to ? undefined : "In the unassigned pool"}
+                        >
+                          {ownerLabel(lead.assigned_to, peopleById, user?.id ?? null, canAssign)}
+                        </span>
+                      )}
                     </span>
 
                     <span className="w-36 shrink-0">

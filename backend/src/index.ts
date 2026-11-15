@@ -1,99 +1,45 @@
-import express, { type NextFunction, type Request, type Response } from "express";
-import cors from "cors";
-import helmet from "helmet";
-import rateLimit from "express-rate-limit";
-import authRoutes from "./routes/auth.js";
-import leadsRoutes from "./routes/leads.js";
-import campaignsRoutes from "./routes/campaigns.js";
-import callLogsRoutes from "./routes/callLogs.js";
-import scriptsRoutes from "./routes/scripts.js";
-import usersRoutes from "./routes/users.js";
-import sipAccountsRoutes from "./routes/sipAccounts.js";
-import { PORT, CORS_ORIGINS, BODY_LIMIT, NODE_ENV } from "./config/env.js";
-
-const app = express();
-
-app.disable("x-powered-by");
-app.set("trust proxy", 1);
-
-app.use(helmet());
+import { app, schemaReady } from "./app.js";
+import { PORT, NODE_ENV } from "./config/env.js";
+import { closePool } from "./db/pool.js";
 
 /**
- * Origins come from CORS_ORIGINS. The previous `origin: true` reflected every
- * caller while also sending `Access-Control-Allow-Credentials: true`.
+ * Long-lived server entrypoint: Docker, `npm run dev`, a VPS.
+ *
+ * Vercel does not use this file — it uses `api/index.ts`. Keeping them separate is
+ * what lets the same app run as a process and as a function without either mode
+ * carrying the other's assumptions.
  */
-app.use(
-  cors({
-    origin: CORS_ORIGINS === "*" ? true : CORS_ORIGINS,
-    credentials: false,
-    methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    maxAge: 600,
-  })
-);
+async function main(): Promise<void> {
+  // Awaited before listening, not raced against it. Binding the port first would
+  // let a request arrive while the tables are still being created, and the
+  // resulting error would look like a broken route rather than a boot sequence.
+  try {
+    await schemaReady;
+  } catch (err) {
+    console.error("[api] schema could not be applied, refusing to start:", err);
+    process.exitCode = 1;
+    return;
+  }
 
-app.use(express.json({ limit: BODY_LIMIT }));
-
-/** Brute-force protection for the credential endpoints. */
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 20,
-  standardHeaders: "draft-7",
-  legacyHeaders: false,
-  message: { error: "Too many attempts. Please try again in a few minutes." },
-});
-
-/** Coarse global limiter; generous enough not to affect normal SPA polling. */
-const apiLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  limit: 300,
-  standardHeaders: "draft-7",
-  legacyHeaders: false,
-  message: { error: "Rate limit exceeded. Please slow down." },
-});
-
-app.get("/api/health", (_req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
-});
-
-app.use("/api/auth", authLimiter, authRoutes);
-app.use("/api", apiLimiter);
-app.use("/api/leads", leadsRoutes);
-app.use("/api/campaigns", campaignsRoutes);
-app.use("/api/call-logs", callLogsRoutes);
-app.use("/api/scripts", scriptsRoutes);
-app.use("/api/users", usersRoutes);
-app.use("/api/sip-accounts", sipAccountsRoutes);
-
-app.use("/api", (_req: Request, res: Response) => {
-  res.status(404).json({ error: "Endpoint not found" });
-});
-
-/**
- * Terminal error handler. Internal error messages are logged server-side but
- * never returned to the client.
- */
-app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  console.error("[api] unhandled error:", err);
-  if (res.headersSent) return;
-  res.status(500).json({
-    error: "Internal server error",
-    ...(NODE_ENV === "production" ? {} : { detail: err.message }),
+  const server = app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Cold Dialer API running on http://localhost:${PORT} (${NODE_ENV})`);
   });
-});
 
-const server = app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Cold Dialer API running on http://localhost:${PORT} (${NODE_ENV})`);
-});
+  function shutdown(signal: string): void {
+    console.log(`[api] ${signal} received, closing server`);
+    // Stop accepting first, then release the pool. The reverse order would let an
+    // in-flight request fail on a connection that was closed under it.
+    server.close(() => {
+      closePool().finally(() => process.exit(0));
+    });
+    // Do not hang forever if a connection refuses to drain.
+    setTimeout(() => process.exit(1), 10_000).unref();
+  }
 
-function shutdown(signal: string): void {
-  console.log(`[api] ${signal} received, closing server`);
-  server.close(() => process.exit(0));
-  // Do not hang forever if a connection refuses to drain.
-  setTimeout(() => process.exit(1), 10_000).unref();
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 }
 
-process.on("SIGTERM", () => shutdown("SIGTERM"));
-process.on("SIGINT", () => shutdown("SIGINT"));
+void main();
 
 export default app;

@@ -95,4 +95,6 @@ See [HOSTINGER_SETUP.md](../scripts/HOSTINGER_SETUP.md)
 |----------|----------|-------------|
 | PORT | No | Server port (default: 4000) |
 | JWT_SECRET | Yes | Secret for JWT tokens |
-| DATABASE_URL | No | SQLite database path |
+| DATABASE_URL | Yes | Postgres connection string, `postgres://user:pass@host:5432/db` |
+| PGSSLMODE | No | `require` (default), `no-verify`, or `disable` on a private network |
+| PGPOOL_MAX | No | Connections per instance (default 3; serverless multiplies by instance count) |

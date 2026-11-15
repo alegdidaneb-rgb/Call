@@ -6,7 +6,7 @@ type SipSessionManager = SipJs.Web.SessionManager;
 type SipSession = SipJs.Session;
 import {
   isUsableAccount,
-  resolveStunUrls,
+  resolveIceServers,
   usernameFromSipUri,
   type SipAccount,
 } from "./config";
@@ -171,6 +171,161 @@ async function acquireMicrophone(): Promise<void> {
   }
 }
 
+/**
+ * Asks the browser for the microphone and reports why it could not have one.
+ *
+ * Exported for the settings page. The engine already does this before dialling,
+ * but doing it there means an administrator finds out a headset is unplugged or a
+ * permission is blocked at the moment an agent tries to call a lead — with the lead
+ * on the line. Checking it from the settings page costs nothing and answers a
+ * question that has no other way to be asked before then.
+ */
+export async function checkMicrophone(): Promise<{ ok: boolean; failure: SipFailure | null }> {
+  try {
+    await acquireMicrophone();
+    return { ok: true, failure: null };
+  } catch (error) {
+    return {
+      ok: false,
+      failure: asFailure(error, {
+        code: "mic_unavailable",
+        message: "No microphone could be opened.",
+        hint: "Connect a microphone, allow it for this site, and try again.",
+      }),
+    };
+  }
+}
+
+/** The candidate types an ICE gather can produce. */
+export type IceCandidateType = "host" | "srflx" | "prflx" | "relay";
+
+export interface IceGatheringReport {
+  ok: boolean;
+  /** Which candidate types were gathered, in the order they arrived. */
+  candidateTypes: IceCandidateType[];
+  /** A relay candidate means a TURN server accepted the allocation. */
+  relayFound: boolean;
+  /** Whether this account was configured with a usable TURN server at all. */
+  turnConfigured: boolean;
+  failure: SipFailure | null;
+}
+
+/**
+ * Gathers ICE candidates against the account's own servers and reports what came back.
+ *
+ * Registration proves the SIP credentials are right. It proves nothing about media:
+ * a call can register perfectly and then connect in silence, because the two
+ * browsers could not find a path for the audio. That failure is invisible in every
+ * other check this app has, and it is the one that costs a day of an agent's time
+ * to discover by dialling real leads.
+ *
+ * The candidate types say which case applies. `host` only means the browser could
+ * not even reach a STUN server, so it knows nothing about its own public address.
+ * `srflx` means STUN worked, which is enough for most agents. `relay` means a TURN
+ * server accepted an allocation — the only candidate type that survives a symmetric
+ * NAT or a firewall dropping inbound UDP. So an account configured with TURN that
+ * gathers no relay candidate is misconfigured, and this is where that shows up
+ * rather than in a silent call.
+ *
+ * Needs no microphone: an audio transceiver is added without a stream, so gathering
+ * runs before any permission prompt and cannot be blocked by a denied one.
+ */
+export async function checkIceGathering(
+  account: SipAccount,
+  timeoutMs = 8000
+): Promise<IceGatheringReport> {
+  const iceServers = resolveIceServers(account);
+  const turnConfigured = iceServers.some(
+    (server) =>
+      Array.isArray(server.urls)
+        ? server.urls.some((url) => /^turns?:/i.test(String(url)))
+        : /^turns?:/i.test(String(server.urls))
+  );
+
+  const empty: IceGatheringReport = {
+    ok: false,
+    candidateTypes: [],
+    relayFound: false,
+    turnConfigured,
+    failure: null,
+  };
+
+  if (typeof RTCPeerConnection === "undefined") {
+    return {
+      ...empty,
+      failure: {
+        code: "insecure_context",
+        message: "This browser will not do WebRTC here.",
+        hint: "WebRTC needs a secure origin. Serve this app over HTTPS, or use localhost.",
+      },
+    };
+  }
+
+  let connection: RTCPeerConnection | null = null;
+  try {
+    connection = new RTCPeerConnection({ iceServers });
+    const types: IceCandidateType[] = [];
+
+    const gathered = new Promise<void>((resolve) => {
+      connection?.addEventListener("icegatheringstatechange", () => {
+        if (connection?.iceGatheringState === "complete") resolve();
+      });
+      // Resolved either way: a server that never answers leaves the state at
+      // "gathering" forever, and the timeout below is what ends that.
+      window.setTimeout(resolve, timeoutMs);
+    });
+
+    connection.addEventListener("icecandidate", (event) => {
+      const type = event.candidate?.type;
+      if (type && !types.includes(type as IceCandidateType)) {
+        types.push(type as IceCandidateType);
+      }
+    });
+
+    // An audio transceiver with no stream attached: enough to make the offer
+    // include an audio m-line, which is what causes ICE to gather at all.
+    connection.addTransceiver("audio", { direction: "recvonly" });
+    await connection.setLocalDescription(await connection.createOffer());
+    await gathered;
+
+    const relayFound = types.includes("relay");
+    const failure: SipFailure | null =
+      types.length === 0
+        ? {
+            code: "transport_failed",
+            message: "No network candidates could be gathered.",
+            hint: `None of the configured servers answered: ${iceServers
+              .flatMap((server) => (Array.isArray(server.urls) ? server.urls : [server.urls]))
+              .join(", ")}. Check the addresses, and that this network allows UDP out.`,
+          }
+        : turnConfigured && !relayFound
+          ? {
+              code: "transport_failed",
+              message: "The TURN server did not allocate a relay.",
+              hint:
+                "STUN worked but the relay did not, so the TURN address, username or credential is wrong, or the server is unreachable from here. Calls will still connect for agents on an open network and will have no audio for anyone behind a symmetric NAT.",
+            }
+          : null;
+
+    // No failure is not the same as a good result: report the types so the page can
+    // explain that STUN-only works until it does not.
+    return { ok: failure === null, candidateTypes: types, relayFound, turnConfigured, failure };
+  } catch (error) {
+    return {
+      ...empty,
+      failure: asFailure(error, {
+        code: "transport_failed",
+        message: "The audio path could not be checked.",
+        hint: "The browser refused to gather network candidates. Check that the page is served over HTTPS.",
+      }),
+    };
+  } finally {
+    // A live peer connection keeps gathering and holds a port open; the check is
+    // over either way.
+    connection?.close();
+  }
+}
+
 type Listener = (snapshot: SipEngineSnapshot) => void;
 
 /**
@@ -271,7 +426,6 @@ class SipEngine {
     this.emit({ status: "connecting", failure: null, accountLabel: account.label ?? account.sipUri });
 
     try {
-      const stunUrls = resolveStunUrls(account.provider, account.stunUrls);
       const { Web } = await import("sip.js");
       const manager = new Web.SessionManager(account.wsUrl, {
         aor: account.sipUri,
@@ -294,9 +448,13 @@ class SipEngine {
           reconnectionDelay: 4,
           sessionDescriptionHandlerFactoryOptions: {
             // Without STUN a browser behind NAT offers only host candidates and
-            // the call connects with no audio in one or both directions.
+            // the call connects with no audio in one or both directions. Without
+            // TURN, the same thing happens behind a symmetric NAT or a firewall
+            // that drops inbound UDP, where the public addresses STUN finds are
+            // not reachable. Both come from one definition in config.ts, shared
+            // with the configuration test below.
             peerConnectionConfiguration: {
-              iceServers: stunUrls.map((urls) => ({ urls })),
+              iceServers: resolveIceServers(account),
             },
           },
         },
@@ -638,7 +796,6 @@ export async function testSipAccount(
     };
   }
 
-  const stunUrls = resolveStunUrls(account.provider, account.stunUrls);
   let resolveRegistered: (() => void) | null = null;
   // Never rejects on its own, so abandoning it on timeout cannot produce an
   // unhandled rejection.
@@ -664,7 +821,7 @@ export async function testSipAccount(
       authorizationUsername: usernameFromSipUri(account.sipUri),
       authorizationPassword: account.password,
       sessionDescriptionHandlerFactoryOptions: {
-        peerConnectionConfiguration: { iceServers: stunUrls.map((urls) => ({ urls })) },
+        peerConnectionConfiguration: { iceServers: resolveIceServers(account) },
       },
     },
   });
