@@ -1,10 +1,155 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+// This file has no top-level import of the Supabase client, and that is deliberate.
+// See `loadCreateClient` below for why the dependency is fetched inside a request
+// rather than at module scope. Naming it here even in a type position would add a
+// second thing that has to resolve before the worker can boot.
 
-// NOTE: this file deliberately begins with the import rather than a comment.
-// The Supabase management API returned a stored body with its leading `/**`
-// removed, which would be a syntax error if that is what actually gets
-// deployed. Starting with a statement makes the round trip verifiable: if the
-// stored body still begins with `import`, nothing was stripped.
+/**
+ * The parts of the Supabase client this function actually uses.
+ *
+ * Declared structurally instead of importing the real type. Types are erased before
+ * this runs, so an imprecise declaration cannot break anything at runtime — while a
+ * CDN import in a type position is still a resolution the platform may attempt. The
+ * `select` builder is both awaitable (for `count`/`head` queries) and chainable
+ * (into `eq().maybeSingle()`), which is what the intersection below expresses.
+ */
+type QueryError = { message: string } | null;
+
+type SupabaseClient = {
+  from(table: string): {
+    select(
+      columns: string,
+      options?: { count?: "exact"; head?: boolean }
+    ): PromiseLike<{ data: unknown; error: QueryError; count: number | null }> & {
+      eq(column: string, value: string): {
+        maybeSingle(): Promise<{ data: Record<string, unknown> | null; error: QueryError }>;
+      };
+    };
+    update(values: Record<string, unknown>): {
+      eq(column: string, value: string): Promise<{ error: QueryError }>;
+    };
+  };
+  auth: {
+    getUser(jwt: string): Promise<{
+      data: { user?: { id: string } } | null;
+      error: QueryError;
+    }>;
+    admin: {
+      createUser(options: Record<string, unknown>): Promise<{
+        data: { user?: { id: string } } | null;
+        error: QueryError;
+      }>;
+      updateUserById(
+        id: string,
+        options: Record<string, unknown>
+      ): Promise<{ error: QueryError }>;
+    };
+  };
+};
+
+/**
+ * The Supabase client factory, loaded on first request rather than at module scope.
+ *
+ * A top-level `import` from a CDN is a network fetch that happens while the worker
+ * boots. If it fails — the registry is unreachable, slow, or serves a version that
+ * no longer resolves — the worker dies before it can run a single line of this
+ * file, and the platform returns its own error page. That page carries no CORS
+ * headers, so the browser reports "Failed to send a request to the Edge Function"
+ * and the actual cause never reaches anybody: not the user, and not this function's
+ * logs, because there is no running function to log from.
+ *
+ * Loaded here instead, the same failure is caught, and answered as JSON *with* CORS
+ * headers, so the caller sees the reason. `CLIENT_SOURCES` below then gives it more
+ * than one place to succeed.
+ */
+type ClientFactory = (
+  url: string,
+  key: string,
+  options?: Record<string, unknown>
+) => SupabaseClient;
+
+/**
+ * Where to get `@supabase/supabase-js` from, tried in order.
+ *
+ * Three sources rather than one, because each fails for a different reason and this
+ * function holds the service role key: total failure means nobody can be onboarded.
+ *
+ * 1. `npm:` — resolved by the runtime itself. No third-party CDN in the path of code
+ *    that runs with the service role key, which is also a trust improvement: an
+ *    esm.sh import means whoever serves that URL supplies the code.
+ * 2. the same exact version through esm.sh, for a runtime whose npm resolution is
+ *    unavailable.
+ * 3. the floating `@supabase/supabase-js@2` specifier this function has always used.
+ *    Last, and only as a last resort: a range has to be resolved against the
+ *    registry on every cold start, so it adds a lookup that the pinned versions
+ *    above do not need, and it can move to a release nobody tested.
+ *
+ * Both pinned entries name 2.118.0 exactly. Pinning is what makes the result
+ * reproducible: `@2` resolves to whatever is newest when the worker boots, so the
+ * same deploy can load different code on different days.
+ *
+ * Each specifier is written as a literal. A computed `import(expr)` is legal Deno,
+ * but a literal is one a bundler or a deploy-time analyser can see, and there is no
+ * benefit to hiding these.
+ */
+const CLIENT_SOURCES: ReadonlyArray<{ name: string; load(): Promise<unknown> }> = [
+  {
+    name: "npm:@supabase/supabase-js@2.118.0",
+    load: () => import("npm:@supabase/supabase-js@2.118.0"),
+  },
+  {
+    name: "https://esm.sh/@supabase/supabase-js@2.118.0",
+    load: () => import("https://esm.sh/@supabase/supabase-js@2.118.0"),
+  },
+  {
+    name: "https://esm.sh/@supabase/supabase-js@2",
+    load: () => import("https://esm.sh/@supabase/supabase-js@2"),
+  },
+];
+
+/**
+ * Loads the client factory, or throws an error naming every source that was tried.
+ *
+ * The accumulated detail matters more than the retry itself. A single-source
+ * failure reports "could not load dependency", which does not distinguish the
+ * registry being down from the runtime not supporting the specifier at all — and
+ * those have different fixes. Listing each attempt and its own reason makes the
+ * first log line sufficient to act on.
+ */
+async function loadCreateClient(): Promise<ClientFactory> {
+  const failures: string[] = [];
+
+  for (const source of CLIENT_SOURCES) {
+    try {
+      const mod = (await source.load()) as { createClient?: unknown };
+      if (typeof mod.createClient !== "function") {
+        // Resolved, but is not the module we expected — a version whose exports
+        // moved, or a stub. Trying the next source is still the right response.
+        failures.push(`${source.name}: no createClient export`);
+        continue;
+      }
+      if (failures.length > 0) {
+        // Worth recording: it says which source a deployment is actually relying
+        // on, which is otherwise invisible.
+        console.warn(
+          `[admin-users] loaded the Supabase client from ${source.name} after: ${failures.join(" | ")}`
+        );
+      }
+      return mod.createClient as ClientFactory;
+    } catch (err) {
+      failures.push(
+        `${source.name}: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+
+  throw new Error(`no source could be loaded — ${failures.join(" | ")}`);
+}
+
+// NOTE on the shape of this file. The Supabase management API has previously
+// returned a stored body with its leading `/**` removed, which would deploy as a
+// syntax error. This file therefore starts with line comments, so no `/**` block is
+// in the position that gets stripped, and the round trip stays verifiable: after a
+// deploy, the stored body should still begin with exactly this line.
 /**
  * Admin-only user provisioning.
  *
@@ -207,7 +352,7 @@ function normaliseUsername(username: string): string {
  */
 async function requireAdmin(
   req: Request,
-  admin: ReturnType<typeof createClient>
+  admin: SupabaseClient
 ): Promise<{ adminId: string } | { response: Response }> {
   const header = req.headers.get("authorization") ?? "";
   const token = header.replace(/^Bearer\s+/i, "").trim();
@@ -245,7 +390,7 @@ async function requireAdmin(
  * as inert and it can read nothing.
  */
 async function provision(
-  admin: ReturnType<typeof createClient>,
+  admin: SupabaseClient,
   req: Request,
   opts: {
     username: string;
@@ -334,10 +479,20 @@ async function provision(
   );
 }
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders(req) });
-  }
+/**
+ * Answers a preflight, and deliberately does nothing else.
+ *
+ * The preflight must succeed even when everything behind it is broken. If it did
+ * not, a dependency failure or a thrown error would present to the browser as a
+ * blocked cross-origin request, and the real cause would be replaced by a generic
+ * network complaint. Keeping OPTIONS free of dependencies, environment lookups and
+ * database access is what preserves the diagnostic.
+ */
+function preflight(req: Request): Response {
+  return new Response(null, { status: 204, headers: corsHeaders(req) });
+}
+
+async function handle(req: Request): Promise<Response> {
   if (req.method !== "POST") {
     return json(405, { error: "Method not allowed" }, req);
   }
@@ -349,9 +504,26 @@ Deno.serve(async (req) => {
     return json(500, { error: "Function is misconfigured" }, req);
   }
 
-  const admin = createClient(url, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  let admin: SupabaseClient;
+  try {
+    const createClient = await loadCreateClient();
+    admin = createClient(url, serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+  } catch (err) {
+    // Named explicitly: this is a dependency-resolution failure, not a bug in the
+    // request, and "Internal server error" would send the operator looking at the
+    // wrong thing.
+    console.error("[admin-users] could not load the Supabase client:", err);
+    return json(
+      502,
+      {
+        error: "The function could not load its Supabase client dependency",
+        detail: err instanceof Error ? err.message : String(err),
+      },
+      req
+    );
+  }
 
   let body: Record<string, unknown>;
   try {
@@ -492,4 +664,43 @@ Deno.serve(async (req) => {
     role: requestedRole,
     invitedBy: auth.adminId,
   });
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return preflight(req);
+
+  /**
+   * Nothing may escape this handler without CORS headers attached.
+   *
+   * An exception that reaches the platform becomes its own error page, which the
+   * browser cannot read cross-origin — so the caller sees "Failed to send a
+   * request to the Edge Function" and the reason is lost. Every failure this
+   * function can have is therefore converted into a JSON response that carries the
+   * origin headers, including the ones nobody anticipated. `detail` is included
+   * because this endpoint is administered, not public: the operator needs the
+   * cause, and the response is only readable by an origin already allowed to call
+   * it.
+   */
+  try {
+    return await handle(req);
+  } catch (err) {
+    console.error("[admin-users] unhandled error:", err);
+    try {
+      return json(
+        500,
+        {
+          error: "The provisioning function failed unexpectedly",
+          detail: err instanceof Error ? err.message : String(err),
+        },
+        req
+      );
+    } catch {
+      // Even building the JSON response failed. Headers still go out, so the
+      // browser can report something more useful than a network error.
+      return new Response("Edge function error", {
+        status: 500,
+        headers: { "content-type": "text/plain", ...corsHeaders(req) },
+      });
+    }
+  }
 });
